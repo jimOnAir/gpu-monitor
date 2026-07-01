@@ -134,11 +134,8 @@ export const App: React.FC = () => {
     const parts: string[] = [];
     agentState.gpus.forEach((gpus) => {
       gpus.forEach((gpu) => {
-        const tempStr = `${gpu.coreTemp}/${gpu.junctionTemp}/${gpu.vramTemp}°C`;
-        const utilStr = `${gpu.gpuUtilization}%`;
-        const powerW = Math.round(gpu.powerUsage);
-        const powerStr = `${powerW}W`;
-        parts.push(`${gpu.name} | ${tempStr} | ${utilStr} | ${powerStr}`);
+        const line = `${gpu.name}\n${gpu.coreTemp}/${gpu.junctionTemp}/${gpu.vramTemp}C | ${gpu.gpuUtilization}% | ${Math.round(gpu.powerUsage)}W`;
+        parts.push(line);
       });
     });
 
