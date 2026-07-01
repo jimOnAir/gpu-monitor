@@ -140,7 +140,7 @@ export const App: React.FC = () => {
       });
     });
 
-    const tooltip = parts.join(', ') || 'GPU Monitor';
+    const tooltip = parts.join('  ') || 'GPU Monitor';
     window.electronAPI.updateTrayTooltip(tooltip);
   }, [agentState.gpus]);
 
