@@ -1,0 +1,18 @@
+[Unit]
+Description=GPU Temperature Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sh -c '/usr/bin/fuser -k 9091/tcp 2>/dev/null || true'
+ExecStart=/usr/local/bin/gputempd 9091
+Restart=on-failure
+RestartSec=15
+MaxStartups=3:30:60
+TimeoutStartSec=30
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

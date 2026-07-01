@@ -1,0 +1,31 @@
+node_modules/
+dist/
+*.js.map
+*.d.ts
+!dist/index.html
+!dist/index.js
+
+# Electron
+*.asar
+
+# Settings (user-specific)
+**/settings.json
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Agent build
+agent/gputempd
+agent/*.o
+
+# Electron-builder output
+release/

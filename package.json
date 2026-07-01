@@ -1,0 +1,56 @@
+{
+  "private": true,
+  "version": "0.1.0",
+  "name": "gpu-monitor",
+  "description": "GPU monitoring Electron app with remote C/Go agents",
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "main": "packages/main/dist/electron-app/main.js",
+  "scripts": {
+    "build": "npm run build:shared && npm run build:main && npm run build:render",
+    "build:main": "npm run build -w @gpu-monitor/main",
+    "build:render": "npm run build -w @gpu-monitor/renderer",
+    "build:shared": "npm run build -w @gpu-monitor/shared",
+    "start": "concurrently 'npm run start:render' 'npm run start:main'",
+    "start:main": "npm run start -w @gpu-monitor/main",
+    "start:render": "npm run start -w @gpu-monitor/renderer",
+    "lint": "npm run lint -w @gpu-monitor/main && npm run lint -w @gpu-monitor/renderer && npm run lint -w @gpu-monitor/shared",
+    "package": "npm run build && electron-builder --linux AppImage",
+    "package:linux": "npm run build && electron-builder --linux AppImage",
+    "clean": "rimraf node_modules packages/*/node_modules release"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "concurrently": "^8.2.0",
+    "electron-builder": "^26.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.3.0",
+    "webpack-dev-server": "^5.2.5"
+  },
+  "build": {
+    "appId": "com.gpu-monitor.app",
+    "productName": "GPU Monitor",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "packages/main/dist/electron-app/**/*",
+      "packages/main/assets/**/*",
+      "packages/renderer/dist/**/*",
+      "packages/shared/dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "linux": {
+      "target": "AppImage",
+      "category": "Utility",
+      "icon": "build/icons/icon.png"
+    }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}

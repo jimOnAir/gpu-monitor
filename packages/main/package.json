@@ -1,0 +1,20 @@
+{
+  "name": "@gpu-monitor/main",
+  "version": "0.1.0",
+  "main": "dist/electron-app/main.js",
+  "scripts": {
+    "build": "node scripts/build-esbuild.js",
+    "start": "electron .",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@gpu-monitor/shared": "*",
+    "electron-is-dev": "^3.0.1",
+    "pino": "^8.17.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "esbuild": "^0.19.0",
+    "typescript": "^5.3.0"
+  }
+}
