@@ -30,6 +30,11 @@ struct GpuData {
     double powerCapW;       /* enforced power limit in watts */
     char driverVersion[80]; /* e.g. "550.90.07" */
     int perfState;          /* P-state index (P0=0, P12=12) */
+    
+    /* Board identity (discovered once at startup, optional) */
+    char vendor[64];        /* "ASUS", "MSI", "Gigabyte", etc. */
+    char model[128];        /* Board model name from VBIOS */
+    char partNumber[64];    /* NVML board part number */
 };
 
 // NVML initialization/cleanup

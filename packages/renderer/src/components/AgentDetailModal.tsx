@@ -172,9 +172,28 @@ export const AgentDetailModal: React.FC<AgentDetailModalProps> = ({ agentId, age
             <div key={`${agentId}-gpu-${gpu.index}`} className="detail-gpu-card">
               {/* GPU Identity */}
               <div className="detail-gpu-header">
-                <div className="detail-gpu-title">
-                  <span className="detail-gpu-index">GPU {gpu.index}</span>
-                  <span className="detail-gpu-name">{gpu.name}</span>
+                <div className="detail-gpu-identity">
+                  <div className="detail-gpu-title">
+                    <span className="detail-gpu-index">GPU {gpu.index}</span>
+                    <span className="detail-gpu-name">{gpu.name}</span>
+                  </div>
+                  <div className="detail-gpu-manufacturer">
+                    {gpu.vendor && (
+                      <span className="detail-gpu-vendor-label">
+                        Manufacturer: <span className="detail-gpu-vendor">{gpu.vendor}</span>
+                      </span>
+                    )}
+                    {gpu.model && (
+                      <span className="detail-gpu-model-label">
+                        Model: <span className="detail-gpu-model">{gpu.model}</span>
+                      </span>
+                    )}
+                    {gpu.partNumber && (
+                      <span className="detail-gpu-pn-label">
+                        Part #: <span className="detail-gpu-part-number">{gpu.partNumber}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="detail-gpu-uuid" title={gpu.uuid}>{gpu.uuid}</div>
               </div>

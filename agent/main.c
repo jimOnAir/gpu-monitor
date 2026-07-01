@@ -31,6 +31,7 @@
 #include <microhttpd.h>
 
 #include "gpu.h"
+#include "gpu_identity.h"
 #include "logger.h"
 
 #define DEFAULT_PORT 8080
@@ -118,7 +119,8 @@ char* generate_json_response(void) {
             "\"coreStatus\":\"%s\",\"junctionStatus\":\"%s\",\"vramStatus\":\"%s\","
             "\"fanSpeed\":%d,\"gpuClockMHz\":%d,\"memClockMHz\":%d,"
             "\"tempShutdown\":%d,\"tempSlowdown\":%d,\"powerCapW\":%.1f,"
-            "\"driverVersion\":\"%s\",\"perfState\":%d}",
+            "\"driverVersion\":\"%s\",\"perfState\":%d,"
+            "\"vendor\":\"%s\",\"model\":\"%s\",\"partNumber\":\"%s\"}",
             gpu->uuid,
             gpu->index,
             gpu->name,
@@ -139,7 +141,10 @@ char* generate_json_response(void) {
             gpu->tempSlowdown,
             gpu->powerCapW,
             gpu->driverVersion,
-            gpu->perfState
+            gpu->perfState,
+            gpu->vendor,
+            gpu->model,
+            gpu->partNumber
         );
     }
     
@@ -225,6 +230,20 @@ int main(int argc, char *argv[]) {
         char name[256];
         nvml_gpu_info(i, name, NULL, NULL, NULL, NULL, NULL);
         log_info("  GPU %d: %s", i, name);
+    }
+
+    // Discover board identities (one-time, cached for lifetime)
+    log_info("Discovering GPU board identities...");
+    for (int i = 0; i < gpu_count; i++) {
+        struct GpuIdentity id;
+        discover_gpu_identity(i, &id);
+        log_info("  GPU %d: %s %s (PN: %s)", i,
+                 id.vendor[0] ? id.vendor : "Unknown",
+                 id.model[0] ? id.model : "Unknown",
+                 id.partNumber[0] ? id.partNumber : "N/A");
+        strncpy(gpus[i].vendor, id.vendor, sizeof(gpus[i].vendor) - 1);
+        strncpy(gpus[i].model, id.model, sizeof(gpus[i].model) - 1);
+        strncpy(gpus[i].partNumber, id.partNumber, sizeof(gpus[i].partNumber) - 1);
     }
 
     // Initialize first read

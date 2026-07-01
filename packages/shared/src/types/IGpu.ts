@@ -26,4 +26,8 @@ export interface IGpu {
   powerCapW?: number;
   driverVersion?: string;
   perfState?: number;
+  /* Board identity (optional, for backward compatibility with older agents) */
+  vendor?: string;
+  model?: string;
+  partNumber?: string;
 }

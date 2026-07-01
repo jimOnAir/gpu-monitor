@@ -54,12 +54,15 @@ GPUTEMP_PORT=9100 sudo ./gputempd
       "memoryUsed": 4431924224,
       "memoryTotal": 25769803776,
       "powerUsage": 20.4,
-      "coreStatus": "normal",
-      "junctionStatus": "normal",
-      "vramStatus": "normal"
-    }
-  ]
-}
+       "coreStatus": "normal",
+       "junctionStatus": "normal",
+       "vramStatus": "normal",
+       "vendor": "MSI",
+       "model": "MAG RTX 3090",
+       "partNumber": "MS-7C83"
+     }
+   ]
+ }
 ```
 
 **Response fields:**
@@ -89,6 +92,11 @@ GPUTEMP_PORT=9100 sudo ./gputempd
 | `gpus[].powerCapW` | float | Enforced power limit (W) |
 | `gpus[].driverVersion` | string | NVIDIA driver version |
 | `gpus[].perfState` | int | P-state index (P0 = max perf) |
+| `gpus[].vendor` | string | Board vendor (ASUS, MSI, Gigabyte, etc.), discovered at startup |
+| `gpus[].model` | string | Board model name (from VBIOS), discovered at startup |
+| `gpus[].partNumber` | string | NVML board part number, discovered at startup |
+
+> `vendor`, `model`, and `partNumber` are discovered once at startup (VBIOS ROM + PCI sysfs + NVML fallback) and cached for the lifetime of the daemon. They are not per-polling-cycle data.
 
 **`GET /health`** — проверка доступности:
 

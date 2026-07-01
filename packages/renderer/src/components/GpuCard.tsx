@@ -14,9 +14,16 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName }) => {
       {/* Header */}
       <div className="gpu-card-header">
         <span className="gpu-card-index">GPU {index}</span>
-        <span className="gpu-card-name" title={gpu.name}>
-          {gpu.name}
-        </span>
+        <div className="gpu-card-identity">
+          <span className="gpu-card-name" title={gpu.name}>
+            {gpu.name}
+          </span>
+          {gpu.vendor && (
+            <span className="gpu-card-sub" title={`${gpu.vendor} ${gpu.model || ''}`.trim()}>
+              {gpu.vendor}{gpu.model ? ` ${gpu.model}` : ''}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Temperature Section */}
@@ -42,18 +49,25 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName }) => {
         />
         <GpuRow
           label="Memory"
-          value={gpu.memoryUsed}
-          max={gpu.memoryTotal}
-          unit="B"
+          value={gpu.memoryUsed / GB}
+          max={gpu.memoryTotal / GB}
+          unit="GB"
           status={getMemoryStatus(gpu.memoryUsed, gpu.memoryTotal)}
           showDetail
         />
         <GpuRow
           label="Power"
-          value={gpu.powerUsage / 1000} // Convert milliwatts to watts
-          max={1000} // Assume 1000W max for bar visualization
+          value={gpu.powerUsage}
+          max={gpu.powerCapW || 1000} // Use power cap if available, fallback 1000W
           unit="W"
-          status={gpu.powerUsage > 800000 ? 'danger' : gpu.powerUsage > 600000 ? 'warning' : 'normal'}
+          status={
+            gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.9
+              ? 'danger'
+              : gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.7
+              ? 'warning'
+              : gpu.powerUsage > 800 ? 'danger' : gpu.powerUsage > 600 ? 'warning' : 'normal'
+          }
+          showDetail
         />
       </div>
     </div>
@@ -89,7 +103,7 @@ const GB = 1024 * 1024 * 1024;
 
 function formatValue(value: number, max: number, unit: string, showDetail?: boolean): string {
   if (showDetail) {
-    return `${(value / GB).toFixed(1)}/${(max / GB).toFixed(1)}GB`;
+    return `${value.toFixed(0)}/${max.toFixed(0)}${unit}`;
   }
   if (unit === 'W') {
     return `${value.toFixed(0)}W`;

@@ -137,14 +137,17 @@ agent/
       "fanSpeed": 30,
       "gpuClockMHz": 1700,
       "memClockMHz": 9000,
-      "tempShutdown": 105,
-      "tempSlowdown": 95,
-      "powerCapW": 350.0,
-      "driverVersion": "550.90.07",
-      "perfState": 8
-    }
-  ]
-}
+       "tempShutdown": 105,
+       "tempSlowdown": 95,
+       "powerCapW": 350.0,
+       "driverVersion": "550.90.07",
+       "perfState": 8,
+       "vendor": "MSI",
+       "model": "MAG RTX 3090",
+       "partNumber": "MS-7C83"
+     }
+   ]
+ }
 ```
 
 **`GET /health`** — проверка что агент жив:

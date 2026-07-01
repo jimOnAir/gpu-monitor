@@ -18,7 +18,7 @@ fi
 # 1. Package source + service file only (never ship pre-built binaries)
 tar -czf /tmp/gpu-monitor-agent.tar.gz \
   -C "$SCRIPT_DIR" \
-  gpu.c gpu.h main.c Makefile gputempd.service
+  gpu.c gpu.h gpu_identity.c gpu_identity.h main.c logger.c logger.h Makefile gputempd.service
 
 if is_local; then
   # Local deploy: extract, build, install in-place

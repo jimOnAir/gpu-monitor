@@ -4,7 +4,7 @@ LDFLAGS = -lnvidia-ml -lpci -lmicrohttpd
 
 TARGET = gputempd
 
-SRCS = main.c gpu.c logger.c
+SRCS = main.c gpu.c gpu_identity.c logger.c
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean install

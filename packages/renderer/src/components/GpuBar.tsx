@@ -1,7 +1,4 @@
 import React from 'react';
-import { IGpu } from '@gpu-monitor/shared';
-
-const GB = 1024 * 1024 * 1024;
 
 interface GpuBarProps {
   value: number;
@@ -24,7 +21,7 @@ export const GpuBar: React.FC<GpuBarProps> = ({
   const statusColor = getStatusColor(status);
 
   const displayValue = showDetail
-    ? `${(value / GB).toFixed(1)}/${(max / GB).toFixed(0)}GB`
+    ? `${value.toFixed(0)}/${max.toFixed(0)}${unit}`
     : `${Math.round(value)}${unit}`;
 
   return (

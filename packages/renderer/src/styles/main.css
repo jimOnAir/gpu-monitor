@@ -341,10 +341,28 @@ body {
   font-weight: var(--font-weight-normal);
   color: var(--text-primary);
   text-align: right;
-  max-width: 60%;
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.gpu-card-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+  flex: 1;
+}
+
+.gpu-card-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: var(--font-weight-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .gpu-card-section {
@@ -1162,10 +1180,43 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.detail-gpu-identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
 .detail-gpu-title {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+}
+
+.detail-gpu-manufacturer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: calc(var(--spacing-md) + 4px);
+}
+
+.detail-gpu-vendor-label,
+.detail-gpu-model-label,
+.detail-gpu-pn-label {
+  font-size: var(--font-size-small);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.detail-gpu-vendor-label .detail-gpu-vendor,
+.detail-gpu-model-label .detail-gpu-model {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.detail-gpu-pn-label .detail-gpu-part-number {
+  color: var(--text-muted);
+  font-family: monospace;
+  font-weight: var(--font-weight-normal);
 }
 
 .detail-gpu-index {
@@ -1178,6 +1229,12 @@ body {
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-normal);
   color: var(--text-primary);
+}
+
+.detail-gpu-part-number {
+  color: var(--text-muted);
+  font-family: monospace;
+  font-weight: var(--font-weight-normal);
 }
 
 .detail-gpu-uuid {
