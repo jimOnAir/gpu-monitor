@@ -18,6 +18,7 @@ declare global {
       onOpenSettings: (callback: () => void) => void;
       onWindowClose: () => void;
       updateTrayTemp: (maxTemp: number, warn: number, critical: number) => void;
+      updateTrayTooltip: (text: string) => void;
     };
   }
 }
@@ -125,6 +126,25 @@ export const App: React.FC = () => {
       );
     }
   }, [agentState.gpus, settings.thresholds.core]);
+
+  // Update tray tooltip with full GPU status
+  useEffect(() => {
+    if (!window.electronAPI || agentState.gpus.size === 0) return;
+
+    const parts: string[] = [];
+    agentState.gpus.forEach((gpus) => {
+      gpus.forEach((gpu) => {
+        const tempStr = `${gpu.coreTemp}/${gpu.junctionTemp}/${gpu.vramTemp}°C`;
+        const utilStr = `${gpu.gpuUtilization}%`;
+        const powerW = Math.round(gpu.powerUsage);
+        const powerStr = `${powerW}W`;
+        parts.push(`${gpu.name} | ${tempStr} | ${utilStr} | ${powerStr}`);
+      });
+    });
+
+    const tooltip = parts.join(', ') || 'GPU Monitor';
+    window.electronAPI.updateTrayTooltip(tooltip);
+  }, [agentState.gpus]);
 
   // Save settings when they change
   const handleSaveSettings = useCallback(

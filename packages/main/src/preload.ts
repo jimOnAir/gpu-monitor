@@ -31,4 +31,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateTrayTemp: (maxTemp: number, warn: number, critical: number) => {
     ipcRenderer.send('update-tray-temp', { maxTemp, warn, critical });
   },
+
+  /** Update the system tray tooltip with GPU status text. */
+  updateTrayTooltip: (text: string) => {
+    ipcRenderer.send('update-tray-tooltip', text);
+  },
 });

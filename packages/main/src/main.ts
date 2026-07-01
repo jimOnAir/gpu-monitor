@@ -224,6 +224,11 @@ ipcMain.on('update-tray-temp', (_event, data: { maxTemp: number; warn: number; c
   updateTrayIcon(data.maxTemp, data.warn, data.critical);
 });
 
+ipcMain.on('update-tray-tooltip', (_event, text: string) => {
+  logger.debug('IPC update-tray-tooltip', undefined, `tooltip=${text}`);
+  tray?.setToolTip(text);
+});
+
 // App lifecycle
 app.whenReady().then(() => {
   logger.info('App ready');
