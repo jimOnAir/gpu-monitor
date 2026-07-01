@@ -255,15 +255,20 @@ export const AgentDetailModal: React.FC<AgentDetailModalProps> = ({ agentId, age
                         : 'normal'
                     }
                   />
-                  <div className="detail-metric">
-                    <div className="detail-metric-label">Memory Used</div>
-                    <div className="detail-metric-value">
-                      {(gpu.memoryUsed / (1024 * 1024 * 1024)).toFixed(2)} GB
-                    </div>
-                    <div className="detail-metric-hint">
-                      {((gpu.memoryUsed / gpu.memoryTotal) * 100).toFixed(1)}% of {(gpu.memoryTotal / (1024 * 1024 * 1024)).toFixed(1)} GB
-                    </div>
-                  </div>
+                  <MetricBar
+                    label="Memory Used"
+                    value={gpu.memoryUsed / (1024 * 1024 * 1024)}
+                    max={gpu.memoryTotal / (1024 * 1024 * 1024)}
+                    unit=" GB"
+                    status={
+                      gpu.memoryUsed / gpu.memoryTotal > 0.9
+                        ? 'danger'
+                        : gpu.memoryUsed / gpu.memoryTotal > 0.7
+                        ? 'warning'
+                        : 'normal'
+                    }
+                    hint={`${((gpu.memoryUsed / gpu.memoryTotal) * 100).toFixed(1)}% of ${(gpu.memoryTotal / (1024 * 1024 * 1024)).toFixed(1)} GB`}
+                  />
                 </div>
               </GpuSection>
 
@@ -283,12 +288,6 @@ export const AgentDetailModal: React.FC<AgentDetailModalProps> = ({ agentId, age
                         : 'normal'
                     }
                     hint={gpu.powerCapW ? `Cap: ${gpu.powerCapW.toFixed(0)}W` : undefined}
-                  />
-                  <MetricRow
-                    label="Memory Bandwidth"
-                    value={`${gpu.gpuUtilization.toFixed(0)}%`}
-                    status="normal"
-                    hint="Referenced via GPU utilization"
                   />
                 </div>
               </GpuSection>
