@@ -178,7 +178,7 @@ export const App: React.FC = () => {
               <div key={agentId} className="agent-section">
                 <div className="agent-section-header">
                   <h3>{gpuData[0].agentName}</h3>
-                  <span className="agent-status-badge">
+                  <span className={`agent-status-badge ${agentState.agents.find((a) => a.id === agentId)?.status || ''}`}>
                     {getAgentStatusBadge(agentState.agents.find((a) => a.id === agentId)?.status)}
                   </span>
                 </div>
