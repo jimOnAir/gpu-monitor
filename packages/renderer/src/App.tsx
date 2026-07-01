@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AgentService, AgentState } from './domains/agents/AgentService';
 import { DashboardService } from './domains/dashboard/DashboardService';
-import { AgentList } from './components/AgentList';
-import { AgentDetailModal } from './components/AgentDetailModal';
+import { GpuDetailModal } from './components/GpuDetailModal';
 import { GpuCard } from './components/GpuCard';
 import { Footer } from './components/Footer';
-import { SettingsModal } from './components/SettingsModal';
 import { DebugPanel } from './components/DebugPanel';
+import { SettingsModal } from './components/SettingsModal';
 import { ISettings, DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
 import './styles/main.css';
 
@@ -36,7 +35,12 @@ export const App: React.FC = () => {
     lastFetchTimestamp: new Map(),
     statusChangedAt: new Map(),
   });
-  const [detailAgentId, setDetailAgentId] = useState<string | null>(null);
+  const [selectedGpu, setSelectedGpu] = useState<{
+    agentId: string;
+    agentName: string;
+    gpu: import('@gpu-monitor/shared').IGpu;
+    index: number;
+  } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -134,10 +138,29 @@ export const App: React.FC = () => {
     []
   );
 
+  // Handle GPU card click
+  const handleGpuClick = useCallback((agentId: string, agentName: string, gpu: import('@gpu-monitor/shared').IGpu, index: number) => {
+    setSelectedGpu({ agentId, agentName, gpu, index });
+  }, []);
+
+  const handleCloseGpuDetail = useCallback(() => {
+    setSelectedGpu(null);
+  }, []);
+
   // Prepare data for rendering
   const gpusByAgent = dashboardService.getGpusByAgent(agentState);
   const lastUpdate = dashboardService.getLastUpdateTime(agentState);
   const gpuCount = dashboardService.getGpuCount(agentState);
+
+  // Driver version (all GPUs on one machine share the same driver)
+  const driverVersion = (() => {
+    for (const gpus of agentState.gpus.values()) {
+      if (gpus.length > 0 && gpus[0].driverVersion) {
+        return gpus[0].driverVersion;
+      }
+    }
+    return undefined;
+  })();
 
   return (
     <div className="app">
@@ -159,12 +182,6 @@ export const App: React.FC = () => {
 
       {/* Main Content */}
       <div className="main-content">
-        <AgentList
-          agents={agentState.agents}
-          selectedAgent={detailAgentId}
-          onSelectAgent={setDetailAgentId}
-        />
-
         <div className="gpu-container">
           {gpusByAgent.size === 0 ? (
             <div className="empty-state">
@@ -174,35 +191,39 @@ export const App: React.FC = () => {
               </p>
             </div>
           ) : (
-            Array.from(gpusByAgent.entries()).map(([agentId, gpuData]) => (
-              <div key={agentId} className="agent-section">
-                <div className="agent-section-header">
-                  <h3>{gpuData[0].agentName}</h3>
-                  <span className={`agent-status-badge ${agentState.agents.find((a) => a.id === agentId)?.status || ''}`}>
-                    {getAgentStatusBadge(agentState.agents.find((a) => a.id === agentId)?.status)}
-                  </span>
+            Array.from(gpusByAgent.entries()).map(([agentId, gpuData]) => {
+              const agent = agentState.agents.find((a) => a.id === agentId);
+              return (
+                <div key={agentId} className="agent-section">
+                  <div className="agent-section-header">
+                    <h3>{gpuData[0].agentName}</h3>
+                    <span className="agent-endpoint">{agent?.url || ''}</span>
+                    <span className={`agent-status-badge ${agent?.status || ''}`}>
+                      {getAgentStatusBadge(agent?.status)}
+                    </span>
+                  </div>
+                  <div className="gpu-grid">
+                    {gpuData.map(({ gpu }, idx) => (
+                      <GpuCard
+                        key={`${agentId}-gpu-${gpu.index}`}
+                        gpu={gpu}
+                        index={gpu.index}
+                        agentName={gpuData[0].agentName}
+                        onClick={() => handleGpuClick(agentId, gpuData[0].agentName, gpu, gpu.index)}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="gpu-grid">
-                  {gpuData.map(({ gpu }, idx) => (
-                    <GpuCard
-                      key={`${agentId}-gpu-${gpu.index}`}
-                      gpu={gpu}
-                      index={gpu.index}
-                      agentName={gpuData[0].agentName}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
 
       {/* Footer */}
       <Footer
-        agentState={agentState}
         refreshInterval={settings.refreshInterval}
-        error={error}
+        lastUpdate={lastUpdate}
       />
 
       {/* Settings Modal */}
@@ -213,14 +234,23 @@ export const App: React.FC = () => {
         onSave={handleSaveSettings}
       />
 
-      {/* Agent Detail Modal */}
-      {detailAgentId && (
-        <AgentDetailModal
-          agentId={detailAgentId}
-          agentState={agentState}
-          onClose={() => setDetailAgentId(null)}
-        />
-      )}
+      {/* GPU Detail Modal */}
+      {selectedGpu && (() => {
+        const currentGpus = agentState.gpus.get(selectedGpu.agentId);
+        const currentGpu = currentGpus?.[selectedGpu.index];
+        if (!currentGpu) return null;
+        const agent = agentState.agents.find((a) => a.id === selectedGpu.agentId);
+        return (
+          <GpuDetailModal
+            gpu={currentGpu}
+            gpuIndex={selectedGpu.index}
+            agentName={selectedGpu.agentName}
+            agentStatus={agent?.status || EAgentStatus.Offline}
+            driverVersion={driverVersion}
+            onClose={handleCloseGpuDetail}
+          />
+        );
+      })()}
 
       {/* Debug Panel */}
       <DebugPanel

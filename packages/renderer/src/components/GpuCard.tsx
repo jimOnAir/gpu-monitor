@@ -6,11 +6,19 @@ interface GpuCardProps {
   gpu: IGpu;
   index: number;
   agentName: string;
+  onClick?: () => void;
 }
 
-export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName }) => {
+export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName, onClick }) => {
   return (
-    <div className="gpu-card" role="region" aria-label={`GPU ${index}: ${gpu.name}`}>
+    <div
+      className={`gpu-card${onClick ? ' gpu-card-clickable' : ''}`}
+      role={onClick ? 'button' : 'region'}
+      aria-label={`GPU ${index}: ${gpu.name}`}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+    >
       {/* Header */}
       <div className="gpu-card-header">
         <span className="gpu-card-index">GPU {index}</span>

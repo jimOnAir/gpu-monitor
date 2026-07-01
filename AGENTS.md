@@ -2,9 +2,43 @@
 
 ## Project Status
 
-**Substantially implemented.** C agent (`agent/`) is ~30 KB of production code across 5 source files. Electron app has ~82 KB of working TypeScript/React/CSS across 30+ files — full UI with agent polling, settings management, system tray, debug panel, and detailed GPU monitoring.
+**Substantially implemented.** C agent (`agent/`) is ~30 KB of production code across 5 source files. Electron app has ~85 KB of working TypeScript/React/CSS across 30+ files — full UI with agent polling, settings management, system tray, debug panel, and detailed GPU monitoring.
 
 See `docs/` Obsidian vault for detailed design specs that guided implementation.
+
+## Renderer UI Structure
+
+The renderer (`packages/renderer/src/`) uses a flat dashboard layout with clickable GPU cards:
+
+```
+App.tsx (root orchestrator)
+├── Title Bar (🔥 GPU Monitor + Debug/Settings/Close buttons)
+├── Main Content
+│   ├── gpu-container
+│   │   └── For each agent:
+│   │       ├── agent-section-header (name, endpoint URL, status badge)
+│   │       └── gpu-grid (2-column responsive grid)
+│   │           └── GpuCard (clickable → opens GpuDetailModal)
+│   └── Empty state (no GPU data)
+├── Footer (last update time, refresh interval)
+├── SettingsModal
+├── GpuDetailModal (full GPU info, auto-updates from live state)
+└── DebugPanel (floating, toggleable)
+```
+
+**Key components:**
+- **GpuCard** — compact summary (temps, utilization, power). Click opens detail modal.
+- **GpuDetailModal** — full GPU breakdown (identity, temps w/ thresholds, performance, utilization, power). Resolves GPU data live from `agentState` on every render.
+- **AgentService** — polls agents every `refreshInterval` (default 5s), detects stale/offline agents, manages GPU data Maps.
+- **DashboardService** — aggregates GPU data across agents for display (groups by agent, flattens, finds critical GPU).
+
+**State flow:**
+1. AgentService polls agent endpoints → updates `gpus: Map<agentId, IGpu[]>`
+2. App subscribes → re-renders with new GPU data
+3. Click GPU card → `selectedGpu` state set → GpuDetailModal opens
+4. Modal resolves GPU live from `agentState.gpus` → updates automatically as data refreshes
+
+**Removed components:** `AgentList` (sidebar), `AgentDetailModal` (agent-level detail). Agent context now lives in the section header above each GPU grid.
 
 ## Build & Run
 
@@ -62,7 +96,12 @@ packages/
 ├── main/           # Electron main process. esbuild → dist/
 │   └── src/{main.ts, preload.ts, logger.ts, domains/settings/}
 └── renderer/       # React UI. webpack → dist/
-    └── src/{index.tsx, App.tsx, components/, domains/{agents,dashboard}, styles/}
+    └── src/{
+        index.tsx, App.tsx,
+        components/{GpuCard, GpuDetailModal, Footer, SettingsModal, DebugPanel, GpuBar},
+        domains/{agents/{AgentService, AgentRepository, logger}, dashboard/DashboardService},
+        styles/main.css
+    }
 ```
 
 Key constraints:
