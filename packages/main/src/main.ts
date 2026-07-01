@@ -22,17 +22,45 @@ let lastTrayState: 'normal' | 'warning' | 'critical' | null = null;
 
 /** Load a tray icon PNG from assets/. */
 function loadIcon(name: string): Electron.NativeImage {
-  // Dev: __dirname = packages/main/dist/electron-app/, assets at packages/main/assets/
-  // Prod (asar): __dirname = main/ inside asar, assets at assets/ (one level up)
-  // Note: electron-is-dev can return false when running `electron .` from the
-  // package dir with "main" pointing to dist/. Detect via filesystem instead.
-  const devPath = path.join(__dirname, '../../assets', `${name}.png`);
-  const prodPath = path.join(__dirname, '../assets', `${name}.png`);
-  const iconPath = fs.existsSync(devPath) ? devPath : prodPath;
+  // When running from dist/electron-app/, assets are at packages/main/assets/
+  // Go up two levels: dist/electron-app -> dist -> packages/main
+  const iconPath = path.join(__dirname, '../../assets', `${name}.png`);
+
+  if (!fs.existsSync(iconPath)) {
+    logger.warn({ iconPath }, 'Icon file not found');
+    return nativeImage.createEmpty();
+  }
 
   const img = nativeImage.createFromPath(iconPath);
   logger.info({ name, iconPath, isEmpty: img.isEmpty(), width: img.getSize().width, height: img.getSize().height }, 'Tray icon loaded');
   return img;
+}
+
+/** Load the build icon (256x256) and return as NativeImage. */
+function loadBuildIcon(): Electron.NativeImage {
+  // When running from dist/electron-app/, project root is 4 levels up
+  // dist/electron-app -> packages/main -> packages -> gpu-monitor
+  const projectRoot = path.resolve(__dirname, '../../../../');
+  const iconPath = path.join(projectRoot, 'build', 'icons', 'icon.png');
+
+  if (!fs.existsSync(iconPath)) {
+    logger.warn({ iconPath }, 'Build icon not found, using default tray icon');
+    return nativeImage.createEmpty();
+  }
+
+  const img = nativeImage.createFromPath(iconPath);
+  logger.info({ iconPath, width: img.getSize().width, height: img.getSize().height }, 'Build icon loaded');
+  return img;
+}
+
+/** Get a resized tray icon from the build icon. */
+function getTrayIcon(): Electron.NativeImage {
+  const buildIcon = loadBuildIcon();
+  if (buildIcon.isEmpty()) {
+    return loadIcon('default');
+  }
+  // Resize to 24x24 for tray (Electron handles scaling quality)
+  return buildIcon.resize({ width: 24, height: 24 });
 }
 
 /** Get the appropriate icon based on max temperature. */
@@ -84,8 +112,8 @@ export function saveSettings(settings: unknown): void {
 
 /** Create the system tray icon. */
 function createTray(): void {
-  // Start with a neutral icon; renderer updates it once GPU data arrives
-  tray = new Tray(loadIcon('default'));
+  // Start with the build icon scaled for tray; renderer updates it once GPU data arrives
+  tray = new Tray(getTrayIcon());
   tray.setToolTip('GPU Monitor');
 
   const contextMenu = Menu.buildFromTemplate([
@@ -145,6 +173,7 @@ function createMainWindow(): void {
     transparent: false,
     resizable: true,
     skipTaskbar: false,
+    icon: loadBuildIcon(), // Set app icon for system taskbar/dock
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

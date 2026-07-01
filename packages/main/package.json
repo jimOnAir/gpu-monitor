@@ -5,7 +5,8 @@
   "scripts": {
     "build": "node scripts/build-esbuild.js",
     "start": "electron .",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "install:desktop": "bash scripts/install-desktop-entry.sh"
   },
   "dependencies": {
     "@gpu-monitor/shared": "*",

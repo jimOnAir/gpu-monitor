@@ -1,7 +1,8 @@
 /**
- * Minimal PNG generator for tray icons.
- * Pure Node.js — no external dependencies.
- * Generates solid-color icons with a simple GPU silhouette.
+ * Tray icon generator.
+ * Creates colored background icons with GPU silhouette for tray use.
+ *
+ * Dependencies: none (uses native Node.js zlib for PNG output)
  */
 
 const zlib = require('zlib');
@@ -26,10 +27,10 @@ function chunk(type, data) {
   const typeBuf = Buffer.from(type, 'ascii');
   const len = Buffer.alloc(4);
   len.writeUInt32BE(data.length);
-  const combined = Buffer.concat([len, typeBuf, data]);
+  // PNG CRC is computed over type + data only (NOT the length field)
   const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(combined));
-  return Buffer.concat([combined, crc]);
+  crc.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])));
+  return Buffer.concat([len, typeBuf, data, crc]);
 }
 
 function generatePng(width, height, pixels) {
@@ -45,12 +46,11 @@ function generatePng(width, height, pixels) {
   ihdr[12] = 0; // interlace
 
   // IDAT: raw pixel data with filter byte 0 (none) per row
-  // pixels array is RGBA (4 bytes), IHDR says RGBA (4 bytes)
   const rawData = Buffer.alloc(height * (1 + width * 4));
   for (let y = 0; y < height; y++) {
     rawData[y * (1 + width * 4)] = 0; // filter: none
     for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4; // RGBA stride
+      const idx = (y * width + x) * 4;
       rawData[y * (1 + width * 4) + 1 + x * 4] = pixels[idx];
       rawData[y * (1 + width * 4) + 1 + x * 4 + 1] = pixels[idx + 1];
       rawData[y * (1 + width * 4) + 1 + x * 4 + 2] = pixels[idx + 2];
@@ -82,29 +82,7 @@ function fillRect(pixels, w, h, x, y, rw, rh, r, g, b, a = 255) {
 }
 
 /**
- * Draw a filled circle on a pixel buffer (RGBA).
- */
-function fillCircle(pixels, w, h, cx, cy, radius, r, g, b, a = 255) {
-  const r2 = radius * radius;
-  for (let py = cy - radius; py <= cy + radius; py++) {
-    for (let px = cx - radius; px <= cx + radius; px++) {
-      if (px >= 0 && px < w && py >= 0 && py < h) {
-        const dx = px - cx;
-        const dy = py - cy;
-        if (dx * dx + dy * dy <= r2) {
-          const idx = (py * w + px) * 4;
-          pixels[idx] = r;
-          pixels[idx + 1] = g;
-          pixels[idx + 2] = b;
-          pixels[idx + 3] = a;
-        }
-      }
-    }
-  }
-}
-
-/**
- * Draw a circle outline on a pixel buffer (RGBA) — for the GPU fan.
+ * Draw a circle outline on a pixel buffer (RGBA).
  */
 function drawCircleOutline(pixels, w, h, cx, cy, radius, r, g, b, a = 255, lineWidth = 1) {
   const rOuter = radius + lineWidth / 2;
@@ -130,46 +108,75 @@ function drawCircleOutline(pixels, w, h, cx, cy, radius, r, g, b, a = 255, lineW
 }
 
 /**
- * Generate a tray icon PNG.
- * @param {number} size - Icon size in pixels (24 for Linux tray compatibility)
- * @param {number} bgR, bgG, bgB - Background fill color
+ * Generate a tray icon PNG with colored background and GPU silhouette.
+ * @param {number} size - Icon size in pixels (24 for tray)
+ * @param {number} bgR, bgG, bgB - Background color
+ * @param {number} accentR, accentG, accentB - GPU accent color
  * @returns {Buffer} - PNG file data
  */
-function generateIcon(size, bgR, bgG, bgB) {
-  const pixels = new Uint8Array(size * size * 4); // RGBA
+function generateIcon(size, bgR, bgG, bgB, accentR = 200, accentG = 200, accentB = 200) {
+  const pixels = new Uint8Array(size * size * 4);
 
-  // Background: colored rounded rectangle (approximated as filled rect)
-  fillRect(pixels, size, size, 0, 0, size, size, bgR, bgG, bgB);
+  // Background with slight gradient (darker at edges)
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const distFromCenter = Math.sqrt(
+        Math.pow((x - size / 2) / (size / 2), 2) +
+        Math.pow((y - size / 2) / (size / 2), 2)
+      );
+      const factor = Math.max(0.7, 1 - distFromCenter * 0.3);
+      pixels[idx] = Math.round(bgR * factor);
+      pixels[idx + 1] = Math.round(bgG * factor);
+      pixels[idx + 2] = Math.round(bgB * factor);
+      pixels[idx + 3] = 255;
+    }
+  }
 
-  // Slightly darker border effect (1px inner shadow)
-  const borderAlpha = 40;
-  fillRect(pixels, size, size, 0, 0, size, 1, 0, 0, 0, borderAlpha); // top
-  fillRect(pixels, size, size, 0, size - 1, size, 1, 0, 0, 0, borderAlpha); // bottom
-  fillRect(pixels, size, size, 0, 0, 1, size, 0, 0, 0, borderAlpha); // left
-  fillRect(pixels, size, size, size - 1, 0, 1, size, 0, 0, 0, borderAlpha); // right
-
+  // Circular border (subtle)
+  const borderR = size * 0.45;
   const cx = Math.floor(size / 2);
   const cy = Math.floor(size / 2);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist >= borderR - 1 && dist <= borderR) {
+        const idx = (y * size + x) * 4;
+        pixels[idx] = Math.min(255, bgR + 30);
+        pixels[idx + 1] = Math.min(255, bgG + 30);
+        pixels[idx + 2] = Math.min(255, bgB + 30);
+        pixels[idx + 3] = 180;
+      }
+    }
+  }
 
-  // GPU body (shroud) — white rectangle
-  const gpuX = Math.floor(size * 0.15);
-  const gpuY = Math.floor(size * 0.25);
-  const gpuW = Math.floor(size * 0.7);
+  // GPU body (simplified geometric shape)
+  const gpuW = Math.floor(size * 0.72);
   const gpuH = Math.floor(size * 0.42);
-  fillRect(pixels, size, size, gpuX, gpuY, gpuW, gpuH, 255, 255, 255, 230);
+  const gpuX = Math.floor((size - gpuW) / 2);
+  const gpuY = Math.floor(size * 0.24);
 
-  // GPU fan (circle outline) — dark
-  const fanCx = Math.floor(size * 0.38);
-  const fanCy = Math.floor(gpuY + gpuH * 0.45);
-  const fanR = Math.floor(Math.min(gpuW, gpuH) * 0.38);
-  drawCircleOutline(pixels, size, size, fanCx, fanCy, fanR, 15, 23, 42, 230, 1.5);
+  // Main GPU body
+  fillRect(pixels, size, size, gpuX, gpuY, gpuW, gpuH, accentR, accentG, accentB, 220);
 
-  // PCIe connector tab — white, at bottom-right of GPU body
-  const pcieX = Math.floor(gpuX + gpuW * 0.55);
+  // GPU details - fan circles
+  const fanR = Math.floor(gpuH * 0.38);
+  const fan1X = Math.floor(gpuX + gpuW * 0.32);
+  const fan1Y = Math.floor(gpuY + gpuH * 0.48);
+  const fan2X = Math.floor(gpuX + gpuW * 0.68);
+  const fan2Y = fan1Y;
+
+  drawCircleOutline(pixels, size, size, fan1X, fan1Y, fanR, 50, 50, 50, 200, 2);
+  drawCircleOutline(pixels, size, size, fan2X, fan2Y, fanR, 50, 50, 50, 200, 2);
+
+  // PCIe connector
+  const pcieW = Math.floor(gpuW * 0.42);
+  const pcieH = Math.floor(size * 0.14);
+  const pcieX = Math.floor(gpuX + gpuW * 0.28);
   const pcieY = Math.floor(gpuY + gpuH);
-  const pcieW = Math.floor(gpuW * 0.35);
-  const pcieH = Math.floor(size * 0.18);
-  fillRect(pixels, size, size, pcieX, pcieY, pcieW, pcieH, 255, 255, 255, 230);
+  fillRect(pixels, size, size, pcieX, pcieY, pcieW, pcieH, accentR, accentG, accentB, 180);
 
   return generatePng(size, size, pixels);
 }

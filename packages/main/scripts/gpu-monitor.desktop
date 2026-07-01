@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=GPU Monitor
+Comment=Monitor GPU temperatures and utilization
+Exec=gpu-monitor
+Icon=gpu-monitor
+Terminal=false
+Categories=System;Monitor;
+Keywords=GPU;Monitor;Temperature;
+StartupNotify=false
