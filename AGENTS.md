@@ -2,9 +2,9 @@
 
 ## Project Status
 
-**Early scaffolding.** `packages/*/src/` directories exist but are **empty** — no TypeScript source files have been written yet. The C agent (`agent/`) is the only runnable code (~350 LOC across 2 files).
+**Substantially implemented.** C agent (`agent/`) is ~30 KB of production code across 5 source files. Electron app has ~82 KB of working TypeScript/React/CSS across 30+ files — full UI with agent polling, settings management, system tray, debug panel, and detailed GPU monitoring.
 
-Before editing any TypeScript file, check whether the parent directory is empty. The `docs/` Obsidian vault has detailed design specs that should guide implementation.
+See `docs/` Obsidian vault for detailed design specs that guided implementation.
 
 ## Build & Run
 
@@ -13,7 +13,7 @@ Before editing any TypeScript file, check whether the parent directory is empty.
 ```bash
 cd agent
 make              # builds gputempd
-sudo ./gputempd [port]   # default port 8080, or GPUTEMP_PORT env var
+sudo ./gputempd [port]   # default port 9091, or GPUTEMP_PORT env var
 ```
 
 Dependencies (installed on server, not in this repo): `libnvidia-ml-dev`, `libpciaccess-dev`, `libmicrohttpd-dev`. Build flags: `-I/opt/cuda/include`.
@@ -42,7 +42,7 @@ npm run clean                     # removes node_modules everywhere
 
 | Endpoint | Returns |
 |----------|---------|
-| `GET /gpu` | JSON array of GPU data (see `agent/README.md` for shape) |
+| `GET /gpu` | JSON object `{timestamp, gpus: [...]}` (see `agent/README.md` for shape) |
 | `GET /health` | `{"status":"ok"}` |
 
 All env vars parsed **inline in `main.c`** — there is no config module.
@@ -58,11 +58,11 @@ agent/              # C daemon (only real code)
 
 packages/
 ├── shared/         # Types + enums only (no implementation). tsc → dist/
-│   └── src/{types, enums}/   # EMPTY — needs implementation
+│   └── src/{types, enums}/   # IGpu, IAgent, ISettings, EAgentStatus
 ├── main/           # Electron main process. esbuild → dist/
-│   └── src/{domains/settings, infrastructure/ipc}/  # EMPTY
+│   └── src/{main.ts, preload.ts, logger.ts, domains/settings/}
 └── renderer/       # React UI. webpack → dist/
-    └── src/{components, domains/{agents,dashboard}, styles}  # EMPTY
+    └── src/{index.tsx, App.tsx, components/, domains/{agents,dashboard}, styles/}
 ```
 
 Key constraints:
@@ -75,7 +75,7 @@ Key constraints:
 
 - **No `http.c/h` or `config.c/h`** — all HTTP handling and env parsing are inline in `main.c`.
 - **Max GPUs = 16** (hardcoded in `gpus[16]` static array and `devices[16]`).
-- **JSON buffer = 4096 bytes** static — truncation possible with many GPUs.
+- **JSON buffer = 8192 bytes** static — truncation possible with many GPUs.
 - **CORS is wildcard** (`*`) in production code (`main.c:124`).
 - **Junction/VRAM temps require `iomem=relaxed`** kernel parameter — see `agent/README.md` troubleshooting.
-- **Power is milliwatts → watts** conversion in `gpu.c:80`.
+- **Power is milliwatts → watts** conversion in `gpu.c:92`.

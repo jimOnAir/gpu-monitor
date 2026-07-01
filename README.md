@@ -25,7 +25,7 @@ Desktop Electron app for monitoring NVIDIA GPUs on remote servers.
 │  │  gputempd (C)                                         │   │
 │  │  - Чтение NVML (core temp, utilization, memory)       │   │
 │  │  - mmap /dev/mem (junction + vram temps)             │   │
-│  │  - HTTP сервер на :8080                               │   │
+│  │  - HTTP сервер на :9091                               │   │
 │  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -69,7 +69,7 @@ Configuration stored in `~/.config/gpu-monitor/settings.json`:
     {
       "id": "srv1",
       "name": "srv1",
-      "url": "http://192.168.1.100:8080"
+      "url": "http://192.168.3.128:9091"
     }
   ],
   "refreshInterval": 5000,
@@ -83,22 +83,43 @@ Configuration stored in `~/.config/gpu-monitor/settings.json`:
 
 ## Agent API
 
-**`GET /gpu`** — current GPU data:
+**`GET /gpu`** — current GPU data (wrapped in `{timestamp, gpus}`):
 
 ```json
-[
-  {
-    "index": 0,
-    "name": "NVIDIA RTX 3090",
-    "coreTemp": 65,
-    "junctionTemp": 72,
-    "vramTemp": 70,
-    "gpuUtilization": 45,
-    "memoryUsed": 10240,
-    "memoryTotal": 24576,
-    "powerUsage": 150
-  }
-]
+{
+  "timestamp": 1700000000,
+  "gpus": [
+    {
+      "uuid": "GPU-63e7dc09-e444-285c-3f3d-67aed394f06d",
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 3090",
+      "coreTemp": 47.0,
+      "junctionTemp": 57.0,
+      "vramTemp": 54.0,
+      "gpuUtilization": 0.0,
+      "memoryUsed": 4431924224,
+      "memoryTotal": 25769803776,
+      "powerUsage": 20.4,
+      "coreStatus": "normal",
+      "junctionStatus": "normal",
+      "vramStatus": "normal",
+      "fanSpeed": 30,
+      "gpuClockMHz": 1700,
+      "memClockMHz": 9000,
+      "tempShutdown": 105,
+      "tempSlowdown": 95,
+      "powerCapW": 350.0,
+      "driverVersion": "550.90.07",
+      "perfState": 8
+    }
+  ]
+}
+```
+
+**`GET /health`** — liveness check:
+
+```json
+{"status":"ok"}
 ```
 
 ## Documentation

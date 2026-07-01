@@ -25,7 +25,7 @@ make
 ## Запуск
 
 ```bash
-# По умолчанию порт 8080
+# По умолчанию порт 9091
 sudo ./gputempd
 
 # Или указать порт
@@ -81,6 +81,14 @@ GPUTEMP_PORT=9100 sudo ./gputempd
 | `gpus[].coreStatus` | string | `normal`, `warning`, or `danger` |
 | `gpus[].junctionStatus` | string | `normal`, `warning`, or `danger` |
 | `gpus[].vramStatus` | string | `normal`, `warning`, or `danger` |
+| `gpus[].fanSpeed` | int | Fan speed (0-100 %) |
+| `gpus[].gpuClockMHz` | int | Current GPU core clock (MHz) |
+| `gpus[].memClockMHz` | int | Current memory clock (MHz) |
+| `gpus[].tempShutdown` | int | Temperature shutdown threshold (°C) |
+| `gpus[].tempSlowdown` | int | Temperature slowdown threshold (°C) |
+| `gpus[].powerCapW` | float | Enforced power limit (W) |
+| `gpus[].driverVersion` | string | NVIDIA driver version |
+| `gpus[].perfState` | int | P-state index (P0 = max perf) |
 
 **`GET /health`** — проверка доступности:
 
@@ -115,7 +123,7 @@ GPUTEMP_LOG_LEVEL=DEBUG        # Log level: DEBUG, INFO (default), WARN, ERROR
 [2025-01-15 10:30:00] [INFO ] gputempd starting (pid=12345)
 [2025-01-15 10:30:00] [INFO ] Detected 1 GPU(s)
 [2025-01-15 10:30:00] [INFO ]   GPU 0: NVIDIA GeForce RTX 3090
-[2025-01-15 10:30:00] [INFO ] Starting HTTP server on port 8080
+[2025-01-15 10:30:00] [INFO ] Starting HTTP server on port 9091
 ```
 
 ## Troubleshooting
@@ -145,7 +153,7 @@ After=network.target
 [Service]
 ExecStart=/usr/local/bin/gputempd
 Restart=always
-Environment=GPUTEMP_PORT=8080
+Environment=GPUTEMP_PORT=9091
 
 [Install]
 WantedBy=multi-user.target

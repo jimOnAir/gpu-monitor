@@ -3,24 +3,27 @@ name: GPU Monitor Electron App
 type: project
 tags: [gpu, monitoring, electron, react, typescript]
 created: 2026-06-30
-status: 🟡 In Progress
+status: ✅ Implemented
 ---
 
 # GPU Monitor Electron App
 
 ## Goal
-Desktop Electron app для мониторинга GPU на удалённых серверах. Подключается к C/Go агентам по HTTP, показывает температуры, утилизацию, память в реальном времени.
+Desktop Electron app для мониторинга GPU на удалённых серверах. Подключается к C агентам по HTTP, показывает температуры, утилизацию, память в реальном времени.
 
 ## Status
-🟡 In Progress — архитектура определена, нужна реализация
+✅ Implemented — полный функционал работает
 
-## Next Actions
-1. [ ] Создать структуру проекта (monorepo: shared/main/renderer)
-2. [ ] Реализовать settings — список агентов + пороговые значения
-3. [ ] Реализовать fetch агентов (HTTP client с retry + error handling)
-4. [ ] Dashboard — список GPU с карточками
-5. [ ] Auto-refresh через setInterval
-6. [ ] Test на srv1/srv2 с реальным агентом
+## Implemented Features
+1. [x] Monorepo структура (shared/main/renderer)
+2. [x] Settings — список агентов + пороговые значения (JSON file + in-memory cache)
+3. [x] Agent polling — HTTP client с timeout + stale detection
+4. [x] Dashboard — GPU cards с температурами и utilization
+5. [x] Auto-refresh через setInterval (configurable 1-60s)
+6. [x] System tray with dynamic icon based on temperature
+7. [x] Debug panel with agent status and log entries
+8. [x] Agent detail modal with extended GPU metrics
+9. [x] Footer with agent status indicators
 
 ## Architecture
 
@@ -52,10 +55,13 @@ gpu-monitor/
 │       └── src/
 │           ├── App.tsx
 │           ├── components/
-│           │   ├── Dashboard.tsx
+│           │   ├── App.tsx
 │           │   ├── GpuCard.tsx
-│           │   ├── GpuRow.tsx
+│           │   ├── GpuBar.tsx
 │           │   ├── AgentList.tsx
+│           │   ├── AgentDetailModal.tsx
+│           │   ├── DebugPanel.tsx
+│           │   ├── Footer.tsx
 │           │   └── SettingsModal.tsx
 │           ├── domains/
 │           │   ├── agents/
@@ -71,9 +77,16 @@ gpu-monitor/
 {
   "agents": [
     {
+      "id": "localhost",
+      "name": "localhost",
+      "url": "http://localhost:9091",
+      "status": "Offline"
+    },
+    {
       "id": "srv1",
       "name": "srv1",
-      "url": "http://192.168.1.100:8080"
+      "url": "http://192.168.3.128:9091",
+      "status": "Offline"
     }
   ],
   "refreshInterval": 5000,
@@ -87,20 +100,37 @@ gpu-monitor/
 
 ### API агента (GET /gpu)
 ```json
-[
-  {
-    "index": 0,
-    "name": "NVIDIA RTX 3090",
-    "coreTemp": 65,
-    "junctionTemp": 72,
-    "vramTemp": 70,
-    "gpuUtilization": 45,
-    "memoryUsed": 10240,
-    "memoryTotal": 24576,
-    "powerUsage": 150
-  }
-]
+{
+  "timestamp": 1700000000,
+  "gpus": [
+    {
+      "uuid": "GPU-63e7dc09-e444-285c-3f3d-67aed394f06d",
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 3090",
+      "coreTemp": 47.0,
+      "junctionTemp": 57.0,
+      "vramTemp": 54.0,
+      "gpuUtilization": 0.0,
+      "memoryUsed": 4431924224,
+      "memoryTotal": 25769803776,
+      "powerUsage": 20.4,
+      "coreStatus": "normal",
+      "junctionStatus": "normal",
+      "vramStatus": "normal",
+      "fanSpeed": 30,
+      "gpuClockMHz": 1700,
+      "memClockMHz": 9000,
+      "tempShutdown": 105,
+      "tempSlowdown": 95,
+      "powerCapW": 350.0,
+      "driverVersion": "550.90.07",
+      "perfState": 8
+    }
+  ]
+}
 ```
+
+**AgentRepository** (packages/main/src/domains/agents/AgentRepository.ts) толерантен к обоим форматам — принимает и обернутый `{"timestamp":..., "gpus":[...]}`, и сырой массив `[...]`.
 
 ### UI Flow
 1. **Dashboard** — список агентов (сверху), каждый агент раскрывается в список GPU

@@ -7,31 +7,34 @@ tags:
   - react
   - typescript
 created: 2026-06-30
-status: planning
+status: ✅ Implemented
 ---
 
 # GPU Monitor Electron App
 
 **Goal:**  
-Desktop Electron app для мониторинга GPU на удалённых серверах. Подключается к C/Go агентам по HTTP, показывает температуры, утилизацию, память в реальном времени.
+Desktop Electron app для мониторинга GPU на удалённых серверах. Подключается к C агентам по HTTP, показывает температуры, утилизацию, память в реальном времени.
 
 **Deadline:**  
 TBD
 
 **Status:**  
-🟡 In Progress — архитектура определена, нужна реализация
+✅ Implemented — полный функционал работает
 
-**Next Actions:**
+**Implemented Features:**
 - [x] Проработать UI/UX дизайн (Electron + React)
-- [ ] Создать структуру проекта (monorepo: shared/main/renderer)
-- [ ] Реализовать settings — список агентов + пороговые значения
-- [ ] Реализовать fetch агентов (HTTP client с retry + error handling)
-- [ ] Dashboard — список GPU с карточками
-- [ ] Auto-refresh через setInterval
-- [ ] Test на srv1/srv2 с реальным агентом
+- [x] Создать структуру проекта (monorepo: shared/main/renderer)
+- [x] Реализовать settings — список агентов + пороговые значения
+- [x] Реализовать fetch агентов (HTTP client с retry + error handling)
+- [x] Dashboard — список GPU с карточками
+- [x] Auto-refresh через setInterval (configurable 1-60s)
+- [x] Test на srv1/srv2 с реальным агентом
+- [x] System tray with dynamic icon based on temperature
+- [x] Debug panel with agent status and log entries
+- [x] Agent detail modal with extended GPU metrics
 
 **Notes:**
-- Reference: [[gddr6-core-junction-vram-temps]] — C-библиотека для чтения GPU температур
+- Reference: [gddr6-core-junction-vram-temps](https://github.com/ThomasBaruzier/gddr6-core-junction-vram-temps) — C-библиотека для чтения GPU температур
 - Backend: NVML + `/dev/mem` для Junction/VRAM температур
 - Frontend: Electron + React (TypeScript) для HTTP запросов к агентам
 - API: JSON формат с индексами GPU, названиями, температурами, статусами
@@ -40,7 +43,7 @@ TBD
 Зависимости: libnvidia-ml-dev, libpciaccess-dev, libmicrohttpd-dev (backend), Electron, React, TypeScript (frontend)
 
 **Related Areas:** [[Homelab]], [[Server Administration]]  
-**Related Resources:** [[gddr6-core-junction-vram-temps]], [[NVIDIA NVML API]]
+**Related Resources:** [gddr6-core-junction-vram-temps](https://github.com/ThomasBaruzier/gddr6-core-junction-vram-temps), [NVIDIA NVML API](https://docs.nvidia.com/deploy/nvml-api/nvml-api-reference.html)
 
 ---
 
@@ -78,7 +81,7 @@ TBD
 │  │  gputempd (C)                                         │   │
 │  │  - Чтение NVML (core temp, utilization, memory)       │   │
 │  │  - mmap /dev/mem (junction + vram temps)             │   │
-│  │  - HTTP сервер на :8080                               │   │
+│  │  - HTTP сервер на :9091                               │   │
 │  │  - Конфигурация через env vars                        │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                          │                                  │
@@ -91,7 +94,7 @@ TBD
 
 ## Components
 
-### 1. Backend: `gputemp-agent`
+### 1. Backend: `gputempd`
 
 **Язык:** C  
 **Зависимости:** libnvidia-ml, libpciaccess, libmicrohttpd  
@@ -99,74 +102,55 @@ TBD
 
 #### Файлы
 ```
-gputemp-agent/
-├── main.c      — HTTP сервер, обработка запросов, пороговые значения
-├── gpu.c/h     — чтение GPU через NVML + /dev/mem
-├── Makefile    — сборка
-└── README.md   — документация
+agent/
+├── main.c          — HTTP сервер, обработка запросов, пороговые значения
+├── gpu.c/h         — чтение GPU через NVML + /dev/mem
+├── logger.c/h      — структурированное логирование (stdout + syslog)
+├── Makefile        — сборка
+├── gputempd.service — systemd unit
+├── scripts/        — build/deploy scripts
+└── README.md       — документация
 ```
 
 #### API
 
-**`GET /metrics`** — текущие показания всех GPU:
+**`GET /gpu`** — текущие показания всех GPU (wrapped in `{timestamp, gpus}`):
 
 ```json
 {
-  "server": "srv1",
   "timestamp": 1719700000,
   "gpus": [
     {
+      "uuid": "GPU-63e7dc09-e444-285c-3f3d-67aed394f06d",
       "index": 0,
-      "name": "NVIDIA GeForce RTX 4090",
-      "core_temp": 65,
-      "junction_temp": 72,
-      "vram_temp": 68,
-      "gpu_utilization": 85,
-      "memory_utilization": 72,
-      "memory_used": 21500,
-      "memory_total": 24576,
-      "power_usage": 320,
-      "status": "normal"
-    },
-    {
-      "index": 1,
-      "name": "NVIDIA GeForce RTX 4090",
-      "core_temp": 71,
-      "junction_temp": 79,
-      "vram_temp": 74,
-      "gpu_utilization": 92,
-      "memory_utilization": 88,
-      "memory_used": 21600,
-      "memory_total": 24576,
-      "power_usage": 450,
-      "status": "warning"
+      "name": "NVIDIA GeForce RTX 3090",
+      "coreTemp": 47.0,
+      "junctionTemp": 57.0,
+      "vramTemp": 54.0,
+      "gpuUtilization": 0.0,
+      "memoryUsed": 4431924224,
+      "memoryTotal": 25769803776,
+      "powerUsage": 20.4,
+      "coreStatus": "normal",
+      "junctionStatus": "normal",
+      "vramStatus": "normal",
+      "fanSpeed": 30,
+      "gpuClockMHz": 1700,
+      "memClockMHz": 9000,
+      "tempShutdown": 105,
+      "tempSlowdown": 95,
+      "powerCapW": 350.0,
+      "driverVersion": "550.90.07",
+      "perfState": 8
     }
-  ],
-  "thresholds": {
-    "core_temp_warn": 70,
-    "core_temp_danger": 85,
-    "junction_temp_warn": 80,
-    "junction_temp_danger": 95,
-    "vram_temp_warn": 80,
-    "vram_temp_danger": 95,
-    "gpu_util_warn": 80,
-    "gpu_util_danger": 95,
-    "mem_util_warn": 80,
-    "mem_util_danger": 95,
-    "power_warn": 400,
-    "power_danger": 500
-  }
+  ]
 }
 ```
 
 **`GET /health`** — проверка что агент жив:
 
 ```json
-{
-  "status": "ok",
-  "timestamp": 1719700000,
-  "gpus_count": 2
-}
+{"status":"ok"}
 ```
 
 #### Конфигурация
@@ -194,20 +178,20 @@ sudo make install
 #### Установка как сервис
 
 ```bash
-sudo systemctl enable gputemp-agent
-sudo systemctl start gputemp-agent
+sudo systemctl enable gputempd
+sudo systemctl start gputempd
 ```
 
 #### Docker
 
 ```dockerfile
 FROM nvidia/cuda:12.2.0-base
-COPY gputemp-agent /usr/local/bin/gputemp-agent
-ENTRYPOINT ["gputemp-agent"]
+COPY agent/gputempd /usr/local/bin/gputempd
+ENTRYPOINT ["gputempd"]
 ```
 
 ```bash
-docker run -d --privileged -p 9100:9100 gputemp-agent
+docker run -d --privileged -p 9091:9091 gputempd
 ```
 
 ---
@@ -246,10 +230,13 @@ gpu-monitor-app/
 │       └── src/
 │           ├── App.tsx
 │           ├── components/
-│           │   ├── Dashboard.tsx
+│           │   ├── App.tsx
 │           │   ├── GpuCard.tsx
-│           │   ├── GpuRow.tsx
+│           │   ├── GpuBar.tsx
 │           │   ├── AgentList.tsx
+│           │   ├── AgentDetailModal.tsx
+│           │   ├── DebugPanel.tsx
+│           │   ├── Footer.tsx
 │           │   └── SettingsModal.tsx
 │           ├── domains/
 │           │   ├── agents/
@@ -275,17 +262,19 @@ gpu-monitor-app/
 sudo apt install libnvidia-ml-dev libpciaccess-dev libmicrohttpd-dev
 
 # Build
-cd gputemp-agent
+cd agent
 make
-sudo make install
 
-# Configure
-echo "GPUTEMP_PORT=9100" | sudo tee /etc/default/gputemp-agent
-echo "GPUTEMP_CORE_WARN=70" | sudo tee -a /etc/default/gputemp-agent
+# Deploy (uses systemd, port 9091)
+bash scripts/deploy.sh <server-host>
+```
 
-# Enable service
-sudo systemctl enable gputemp-agent
-sudo systemctl start gputemp-agent
+Or manually:
+```bash
+sudo cp gputempd /usr/local/bin/
+sudo cp gputempd.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now gputempd
 ```
 
 ### Frontend (desktop app)

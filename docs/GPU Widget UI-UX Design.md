@@ -481,5 +481,5 @@ const isStale = (lastUpdate: number) => Date.now() - lastUpdate > 15000;
 
 ## Related Resources
 
-- [[GPU Monitor Electron App]] — архитектура проекта
-- [[NVIDIA NVML API]] — API для чтения данных с GPU
+- [GPU Monitor Electron App](./GPU%20Monitor%20Electron%20App.md) — архитектура проекта
+- [NVIDIA NVML API](https://docs.nvidia.com/deploy/nvml-api/nvml-api-reference.html) — API для чтения данных с GPU
