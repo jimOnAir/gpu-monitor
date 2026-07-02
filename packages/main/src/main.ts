@@ -54,11 +54,20 @@ app.on('second-instance', () => {
   }
 });
 
+/** Get the base path for resource files (works in both dev and packed modes). */
+function getResourcesPath(): string {
+  if (app.isPackaged) {
+    // In ASAR: __dirname is inside app.asar
+    // Go up to ASAR root, then to packages/main/assets
+    return path.join(__dirname, '../../..', 'packages', 'main', 'assets');
+  }
+  // In dev: go up from dist/electron-app to packages/main/assets
+  return path.join(__dirname, '../../assets');
+}
+
 /** Load a tray icon PNG from assets/. */
 function loadIcon(name: string): Electron.NativeImage {
-  // When running from dist/electron-app/, assets are at packages/main/assets/
-  // Go up two levels: dist/electron-app -> dist -> packages/main
-  const iconPath = path.join(__dirname, '../../assets', `${name}.png`);
+  const iconPath = path.join(getResourcesPath(), `${name}.png`);
 
   if (!fs.existsSync(iconPath)) {
     logger.warn({ iconPath }, 'Icon file not found');
@@ -72,8 +81,18 @@ function loadIcon(name: string): Electron.NativeImage {
 
 /** Load the build icon (256x256) and return as NativeImage. */
 function loadBuildIcon(): Electron.NativeImage {
-  // When running from dist/electron-app/, project root is 4 levels up
-  // dist/electron-app -> packages/main -> packages -> gpu-monitor
+  if (app.isPackaged) {
+    // In ASAR: go up from app.asar to resources, then to build/icons
+    const iconPath = path.join(__dirname, '../../../..', 'build', 'icons', 'icon.png');
+    if (!fs.existsSync(iconPath)) {
+      logger.warn({ iconPath }, 'Build icon not found in ASAR, using default tray icon');
+      return nativeImage.createEmpty();
+    }
+    const img = nativeImage.createFromPath(iconPath);
+    logger.info({ iconPath, width: img.getSize().width, height: img.getSize().height }, 'Build icon loaded (packed)');
+    return img;
+  }
+  // In dev: go up from dist/electron-app to project root
   const projectRoot = path.resolve(__dirname, '../../../../');
   const iconPath = path.join(projectRoot, 'build', 'icons', 'icon.png');
 

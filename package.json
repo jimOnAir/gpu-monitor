@@ -41,10 +41,11 @@
       "packages/main/assets/**/*",
       "packages/renderer/dist/**/*",
       "packages/shared/dist/**/*",
+      "build/icons/**/*",
       "package.json"
     ],
     "asar": true,
-    "linux": {
+      "linux": {
       "target": "AppImage",
       "category": "Utility",
       "icon": "build/icons/icon.png"
