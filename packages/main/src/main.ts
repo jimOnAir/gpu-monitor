@@ -69,39 +69,37 @@ function getResourcesPath(): string {
 function loadIcon(name: string): Electron.NativeImage {
   const iconPath = path.join(getResourcesPath(), `${name}.png`);
 
-  if (!fs.existsSync(iconPath)) {
-    logger.warn({ iconPath }, 'Icon file not found');
-    return nativeImage.createEmpty();
-  }
-
+  // nativeImage.createFromPath works with ASAR paths; returns empty image on failure
   const img = nativeImage.createFromPath(iconPath);
-  logger.info({ name, iconPath, isEmpty: img.isEmpty(), width: img.getSize().width, height: img.getSize().height }, 'Tray icon loaded');
+  if (img.isEmpty()) {
+    logger.warn({ iconPath }, 'Icon file not found or invalid');
+  } else {
+    logger.info({ name, iconPath, isEmpty: img.isEmpty(), width: img.getSize().width, height: img.getSize().height }, 'Tray icon loaded');
+  }
   return img;
 }
 
 /** Load the build icon (256x256) and return as NativeImage. */
 function loadBuildIcon(): Electron.NativeImage {
-  if (app.isPackaged) {
-    // In ASAR: go up from app.asar to resources, then to build/icons
-    const iconPath = path.join(__dirname, '../../../..', 'build', 'icons', 'icon.png');
-    if (!fs.existsSync(iconPath)) {
-      logger.warn({ iconPath }, 'Build icon not found in ASAR, using default tray icon');
-      return nativeImage.createEmpty();
-    }
-    const img = nativeImage.createFromPath(iconPath);
-    logger.info({ iconPath, width: img.getSize().width, height: img.getSize().height }, 'Build icon loaded (packed)');
-    return img;
-  }
-  // In dev: go up from dist/electron-app to project root
-  const projectRoot = path.resolve(__dirname, '../../../../');
-  const iconPath = path.join(projectRoot, 'build', 'icons', 'icon.png');
+  let iconPath: string;
 
-  if (!fs.existsSync(iconPath)) {
+  if (app.isPackaged) {
+    // In ASAR: go up 3 levels to reach resources/, then to build/icons/
+    // __dirname = .../resources/app.asar/dist/electron-app
+    // ../../../ = .../resources
+    iconPath = path.join(__dirname, '../../../', 'build', 'icons', 'icon.png');
+  } else {
+    // In dev: go up from dist/electron-app to project root
+    const projectRoot = path.resolve(__dirname, '../../../../');
+    iconPath = path.join(projectRoot, 'build', 'icons', 'icon.png');
+  }
+
+  const img = nativeImage.createFromPath(iconPath);
+  if (img.isEmpty()) {
     logger.warn({ iconPath }, 'Build icon not found, using default tray icon');
     return nativeImage.createEmpty();
   }
 
-  const img = nativeImage.createFromPath(iconPath);
   logger.info({ iconPath, width: img.getSize().width, height: img.getSize().height }, 'Build icon loaded');
   return img;
 }
