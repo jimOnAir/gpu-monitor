@@ -19,6 +19,23 @@ if (!fs.existsSync(SETTINGS_DIR)) {
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let lastTrayState: 'normal' | 'warning' | 'critical' | null = null;
+let willQuit = false;
+
+// Enforce single instance: if a second launch is attempted, focus the existing window and quit the new process.
+if (!app.requestSingleInstanceLock()) {
+  logger.warn('Another instance is already running — exiting');
+  app.quit();
+  process.exit(0);
+}
+
+app.on('second-instance', () => {
+  logger.info('Second instance attempted — focusing existing window');
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
 
 /** Load a tray icon PNG from assets/. */
 function loadIcon(name: string): Electron.NativeImage {
@@ -186,7 +203,12 @@ function createMainWindow(): void {
   mainWindow.loadFile(path.join(projectRoot, 'packages/renderer/dist/index.html'));
 
   mainWindow.on('close', (event) => {
-    // Don't close the app, just hide the window
+    // If the user chose Exit (Cmd+Q / menu / tray), actually quit.
+    // Otherwise just hide the window to the system tray.
+    if (willQuit) {
+      mainWindow = null;
+      return;
+    }
     event.preventDefault();
     mainWindow?.hide();
   });
@@ -232,6 +254,18 @@ ipcMain.on('update-tray-tooltip', (_event, text: string) => {
 // App lifecycle
 app.whenReady().then(() => {
   logger.info('App ready');
+
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        role: 'appMenu',
+        submenu: [
+          { role: 'quit', label: 'Exit', accelerator: 'CmdOrCtrl+Q' },
+        ],
+      },
+    ]),
+  );
+
   createTray();
   createMainWindow();
 
@@ -240,6 +274,10 @@ app.whenReady().then(() => {
       createMainWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  willQuit = true;
 });
 
 app.on('window-all-closed', () => {
