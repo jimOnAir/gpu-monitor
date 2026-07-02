@@ -1,8 +1,25 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
 import isDev from 'electron-is-dev';
+import { ISettings, DEFAULT_SETTINGS } from '@gpu-monitor/shared';
 import * as path from 'path';
 import * as fs from 'fs';
 import logger from './logger';
+
+/** Validate settings against ISettings shape before persisting. */
+function isValidSettings(data: unknown): data is ISettings {
+  if (!data || typeof data !== 'object') return false;
+  const d = data as Record<string, unknown>;
+  if (!Array.isArray(d.agents)) return false;
+  if (typeof d.refreshInterval !== 'number' || d.refreshInterval <= 0) return false;
+  if (!d.thresholds || typeof d.thresholds !== 'object') return false;
+  const t = d.thresholds as Record<string, unknown>;
+  for (const key of ['core', 'junction', 'vram'] as const) {
+    if (!t[key] || typeof t[key] !== 'object') return false;
+    const entry = t[key] as Record<string, unknown>;
+    if (typeof entry.warn !== 'number' || typeof entry.critical !== 'number') return false;
+  }
+  return true;
+}
 
   // Set app name for proper userData path
   app.setName('gpu-monitor');
@@ -105,25 +122,35 @@ function updateTrayIcon(maxTemp: number, warn: number, critical: number): void {
   tray.setImage(getTempIcon(maxTemp, warn, critical));
 }
 
-/** Load settings from disk, returning defaults if file doesn't exist. */
-export function loadSettings(): unknown {
+/** Load settings from disk, returning defaults if file doesn't exist or is invalid. */
+export function loadSettings(): ISettings {
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
       const raw = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (isValidSettings(parsed)) {
+        return parsed;
+      }
+      logger.warn('Settings file found but invalid — using defaults');
     }
   } catch (err) {
     logger.error({ err: String(err) }, 'Failed to load settings');
   }
-  return null;
+  return { ...DEFAULT_SETTINGS };
 }
 
-/** Save settings to disk. */
-export function saveSettings(settings: unknown): void {
+/** Save settings to disk after validating against ISettings. */
+export function saveSettings(settings: unknown): boolean {
+  if (!isValidSettings(settings)) {
+    logger.error('Refusing to save invalid settings', undefined, 'settings schema validation failed');
+    return false;
+  }
   try {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+    return true;
   } catch (err) {
     logger.error({ err: String(err) }, 'Failed to save settings');
+    return false;
   }
 }
 

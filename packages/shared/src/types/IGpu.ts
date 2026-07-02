@@ -1,6 +1,6 @@
 /**
  * Represents a single GPU as reported by the C agent.
- * Memory and power values are in bytes and milliwatts respectively.
+ * Memory is in bytes; power is in watts (C agent converts mW to W before sending).
  * Extended fields are optional for backward compatibility with older agents.
  */
 export interface IGpu {

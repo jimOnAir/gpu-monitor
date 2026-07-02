@@ -38,9 +38,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose();
   };
 
+  let agentIdCounter = 0;
   const addAgent = () => {
+    agentIdCounter++;
     const newAgent: IAgent = {
-      id: `agent-${Date.now()}`,
+      id: `agent-${Date.now()}-${agentIdCounter}`,
       name: 'New Agent',
       url: 'http://',
       status: EAgentStatus.Offline,

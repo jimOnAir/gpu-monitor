@@ -22,12 +22,6 @@ export const DEFAULT_SETTINGS: ISettings = {
       url: 'http://localhost:9091',
       status: EAgentStatus.Offline,
     },
-    {
-      id: 'srv1',
-      name: 'srv1',
-      url: 'http://192.168.3.128:9091',
-      status: EAgentStatus.Offline,
-    },
   ],
   refreshInterval: 5000,
   thresholds: {

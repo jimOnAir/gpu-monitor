@@ -118,7 +118,7 @@ export const App: React.FC = () => {
       });
     });
 
-    if (maxTemp > 0) {
+    if (maxTemp >= 0) {
       window.electronAPI.updateTrayTemp(
         maxTemp,
         settings.thresholds.core.warn,

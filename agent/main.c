@@ -101,18 +101,32 @@ void fill_gpu_status(struct GpuData *gpu, int index) {
 }
 
 char* generate_json_response(void) {
-    static char response[BUFFER_SIZE];
-    int offset = 0;
+    /* Allocate enough space for max GPUs: each GPU ~450 chars */
+    size_t buf_size = (size_t)BUFFER_SIZE * (1 + (gpu_count + 7) / 8);
+    char *response = (char *)malloc(buf_size);
+    if (!response) {
+        log_error("Failed to allocate JSON buffer (need %zu bytes)", buf_size);
+        return NULL;
+    }
+
     time_t now = time(NULL);
-    
-    offset += sprintf(response + offset, "{\"timestamp\":%ld,\"gpus\":[", now);
-    
+    int offset = snprintf(response, buf_size, "{\"timestamp\":%ld,\"gpus\":[", now);
+
     for (int i = 0; i < gpu_count; i++) {
         struct GpuData *gpu = &gpus[i];
-        
-        if (i > 0) offset += sprintf(response + offset, ",");
-        
-        offset += sprintf(response + offset,
+        int remaining = (int)(buf_size - (size_t)offset);
+
+        if (i > 0) {
+            offset += snprintf(response + offset, (size_t)remaining, ",");
+            remaining = (int)(buf_size - (size_t)offset);
+            if (remaining <= 0) {
+                log_error("JSON buffer overflow at GPU %d (offset=%d, buf=%zu)", i, offset, buf_size);
+                free(response);
+                return NULL;
+            }
+        }
+
+        offset += snprintf(response + offset, (size_t)remaining,
             "{\"uuid\":\"%s\",\"index\":%d,\"name\":\"%s\","
             "\"coreTemp\":%.1f,\"junctionTemp\":%.1f,\"vramTemp\":%.1f,"
             "\"gpuUtilization\":%.1f,\"memoryUsed\":%lu,\"memoryTotal\":%lu,\"powerUsage\":%.1f,"
@@ -146,9 +160,15 @@ char* generate_json_response(void) {
             gpu->model,
             gpu->partNumber
         );
+
+        if (offset < 0 || (size_t)offset >= buf_size) {
+            log_error("JSON buffer overflow at GPU %d", i);
+            free(response);
+            return NULL;
+        }
     }
-    
-    offset += sprintf(response + offset, "]}");
+
+    snprintf(response + offset, (size_t)(buf_size - (size_t)offset), "]}");
     return response;
 }
 
@@ -182,7 +202,15 @@ enum MHD_Result handle_request(void *cls __attribute__((unused)), struct MHD_Con
         }
         
         char *json = generate_json_response();
+        if (!json) {
+            const char *err_body = "{\"error\":\"Internal error: buffer overflow\"}";
+            struct MHD_Response *resp = create_response(err_body, strlen(err_body));
+            enum MHD_Result ret = MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, resp);
+            MHD_destroy_response(resp);
+            return ret;
+        }
         struct MHD_Response *response = create_response(json, strlen(json));
+        free(json); /* allocated by generate_json_response */
         enum MHD_Result ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
         MHD_destroy_response(response);
         return ret;

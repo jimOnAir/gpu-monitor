@@ -66,7 +66,7 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName, onClick
         <GpuRow
           label="Power"
           value={gpu.powerUsage}
-          max={gpu.powerCapW || 1000} // Use power cap if available, fallback 1000W
+          max={gpu.powerCapW ?? 1000} // Use power cap if available, fallback 1000W
           unit="W"
           status={
             gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.9
