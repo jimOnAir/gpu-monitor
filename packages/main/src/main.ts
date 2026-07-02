@@ -54,22 +54,21 @@ app.on('second-instance', () => {
   }
 });
 
-/** Get the base path for resource files (works in both dev and packed modes). */
-function getResourcesPath(): string {
-  if (app.isPackaged) {
-    // In ASAR: __dirname is inside app.asar
-    // Go up to ASAR root, then to packages/main/assets
-    return path.join(__dirname, '../../..', 'packages', 'main', 'assets');
-  }
-  // In dev: go up from dist/electron-app to packages/main/assets
-  return path.join(__dirname, '../../assets');
-}
-
 /** Load a tray icon PNG from assets/. */
 function loadIcon(name: string): Electron.NativeImage {
-  const iconPath = path.join(getResourcesPath(), `${name}.png`);
+  let iconPath: string;
 
-  // nativeImage.createFromPath works with ASAR paths; returns empty image on failure
+  if (app.isPackaged) {
+    // In ASAR: __dirname = .../app.asar/dist/electron-app
+    // Go up 2 levels to ASAR root, then to packages/main/assets
+    iconPath = path.join(__dirname, '/../..', 'packages', 'main', 'assets', `${name}.png`);
+  } else {
+    // In dev: __dirname = packages/main/dist/electron-app
+    // Go up 2 levels to packages/main/assets
+    iconPath = path.join(__dirname, '../../assets', `${name}.png`);
+  }
+
+  // nativeImage.createFromPath works with ASAR paths in Electron
   const img = nativeImage.createFromPath(iconPath);
   if (img.isEmpty()) {
     logger.warn({ iconPath }, 'Icon file not found or invalid');
@@ -84,12 +83,12 @@ function loadBuildIcon(): Electron.NativeImage {
   let iconPath: string;
 
   if (app.isPackaged) {
-    // In ASAR: go up 3 levels to reach resources/, then to build/icons/
-    // __dirname = .../resources/app.asar/dist/electron-app
-    // ../../../ = .../resources
-    iconPath = path.join(__dirname, '../../../', 'build', 'icons', 'icon.png');
+    // In ASAR: __dirname = .../app.asar/dist/electron-app
+    // Go up 2 levels to ASAR root, then to build/icons
+    iconPath = path.join(__dirname, '/../..', 'build', 'icons', 'icon.png');
   } else {
-    // In dev: go up from dist/electron-app to project root
+    // In dev: __dirname = packages/main/dist/electron-app
+    // Go up 3 levels to project root, then to build/icons
     const projectRoot = path.resolve(__dirname, '../../../../');
     iconPath = path.join(projectRoot, 'build', 'icons', 'icon.png');
   }
