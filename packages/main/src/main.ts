@@ -58,15 +58,19 @@ app.on('second-instance', () => {
 function loadIcon(name: string): Electron.NativeImage {
   let iconPath: string;
 
+  logger.info({ isPackaged: app.isPackaged, __dirname, resourcesPath: process.resourcesPath }, 'loadIcon debug');
+
   if (app.isPackaged) {
-    // In ASAR: __dirname = .../app.asar/dist/electron-app
-    // Go up 2 levels to ASAR root, then to packages/main/assets
-    iconPath = path.join(__dirname, '/../..', 'packages', 'main', 'assets', `${name}.png`);
+    // In ASAR: __dirname = .../app.asar/packages/main/dist/electron-app
+    // Go up 2 levels to packages/main, then down to assets/
+    iconPath = path.join(__dirname, '../../assets', `${name}.png`);
   } else {
     // In dev: __dirname = packages/main/dist/electron-app
     // Go up 2 levels to packages/main/assets
     iconPath = path.join(__dirname, '../../assets', `${name}.png`);
   }
+
+  logger.info({ name, iconPath }, 'loadIcon resolved path');
 
   // nativeImage.createFromPath works with ASAR paths in Electron
   const img = nativeImage.createFromPath(iconPath);
@@ -83,12 +87,12 @@ function loadBuildIcon(): Electron.NativeImage {
   let iconPath: string;
 
   if (app.isPackaged) {
-    // In ASAR: __dirname = .../app.asar/dist/electron-app
-    // Go up 2 levels to ASAR root, then to build/icons
-    iconPath = path.join(__dirname, '/../..', 'build', 'icons', 'icon.png');
+    // In ASAR: __dirname = .../app.asar/packages/main/dist/electron-app
+    // Go up 4 levels to ASAR root, then to build/icons
+    iconPath = path.join(__dirname, '../../../..', 'build', 'icons', 'icon.png');
   } else {
     // In dev: __dirname = packages/main/dist/electron-app
-    // Go up 3 levels to project root, then to build/icons
+    // Go up 4 levels to project root, then to build/icons
     const projectRoot = path.resolve(__dirname, '../../../../');
     iconPath = path.join(projectRoot, 'build', 'icons', 'icon.png');
   }
