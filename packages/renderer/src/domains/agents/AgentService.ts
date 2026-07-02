@@ -56,12 +56,17 @@ export class AgentService {
     logger.info('AgentService', undefined, `Initializing with ${settings.agents.length} agent(s), interval=${settings.refreshInterval}ms`);
     this.stopPolling();
     this.agents = [...settings.agents];
+    // Mark all agents as Offline on init — they become Online only after a successful fetch
+    this.agents.forEach((agent) => {
+      agent.status = EAgentStatus.Offline;
+      agent.lastError = 'Initializing';
+    });
+    this.statusChangedAt.clear();
     this.refreshIntervalMs = settings.refreshInterval;
     this.gpus.clear();
     this.lastUpdate.clear();
     this.fetchResult.clear();
     this.lastFetchTimestamp.clear();
-    this.statusChangedAt.clear();
     this.refreshAll();
     this.startPolling(settings.refreshInterval);
   }
@@ -69,6 +74,11 @@ export class AgentService {
   updateSettings(settings: ISettings): void {
     logger.info('AgentService', undefined, `Settings updated, interval=${settings.refreshInterval}ms`);
     this.agents = [...settings.agents];
+    this.agents.forEach((agent) => {
+      agent.status = EAgentStatus.Offline;
+      agent.lastError = 'Settings updated';
+    });
+    this.statusChangedAt.clear();
     this.refreshIntervalMs = settings.refreshInterval;
     this.stopPolling();
     this.startPolling(settings.refreshInterval);

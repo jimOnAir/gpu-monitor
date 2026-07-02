@@ -1,4 +1,4 @@
-import { IGpu } from '@gpu-monitor/shared';
+import { EAgentStatus, IGpu } from '@gpu-monitor/shared';
 import { AgentState } from '../agents/AgentService';
 
 /**
@@ -39,6 +39,7 @@ export class DashboardService {
     const grouped = new Map<string, Array<{ gpu: IGpu; agentName: string }>>();
 
     state.agents.forEach((agent) => {
+      if (agent.status !== EAgentStatus.Online) return;
       const gpus = state.gpus.get(agent.id);
       if (gpus && gpus.length > 0) {
         grouped.set(agent.id, gpus.map((gpu) => ({ gpu, agentName: agent.name })));
@@ -46,6 +47,18 @@ export class DashboardService {
     });
 
     return grouped;
+  }
+
+  /**
+   * Get agents that are not Online (Offline or Stale).
+   * Used to show unreachable agents in the GPU list.
+   */
+  getUnreachableAgents(state: AgentState): Array<{
+    agent: import('@gpu-monitor/shared').IAgent;
+  }> {
+    return state.agents
+      .filter((agent) => agent.status !== EAgentStatus.Online)
+      .map((agent) => ({ agent }));
   }
 
   /**

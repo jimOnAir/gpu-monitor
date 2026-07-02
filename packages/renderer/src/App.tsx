@@ -167,6 +167,7 @@ export const App: React.FC = () => {
 
   // Prepare data for rendering
   const gpusByAgent = dashboardService.getGpusByAgent(agentState);
+  const unreachableAgents = dashboardService.getUnreachableAgents(agentState);
   const lastUpdate = dashboardService.getLastUpdateTime(agentState);
   const gpuCount = dashboardService.getGpuCount(agentState);
 
@@ -201,7 +202,7 @@ export const App: React.FC = () => {
       {/* Main Content */}
       <div className="main-content">
         <div className="gpu-container">
-          {gpusByAgent.size === 0 ? (
+          {gpusByAgent.size === 0 && unreachableAgents.length === 0 ? (
             <div className="empty-state">
               <p>No GPU data available</p>
               <p className="empty-state-hint">
@@ -209,31 +210,53 @@ export const App: React.FC = () => {
               </p>
             </div>
           ) : (
-            Array.from(gpusByAgent.entries()).map(([agentId, gpuData]) => {
-              const agent = agentState.agents.find((a) => a.id === agentId);
-              return (
-                <div key={agentId} className="agent-section">
+            <>
+              {/* Reachable agents */}
+              {Array.from(gpusByAgent.entries()).map(([agentId, gpuData]) => {
+                const agent = agentState.agents.find((a) => a.id === agentId);
+                return (
+                  <div key={agentId} className="agent-section">
+                    <div className="agent-section-header">
+                      <h3>{gpuData[0].agentName}</h3>
+                      <span className="agent-endpoint">{agent?.url || ''}</span>
+                      <span className={`agent-status-badge ${agent?.status || ''}`}>
+                        {getAgentStatusBadge(agent?.status)}
+                      </span>
+                    </div>
+                    <div className="gpu-grid">
+                      {gpuData.map(({ gpu }, idx) => (
+                        <GpuCard
+                          key={`${agentId}-gpu-${gpu.index}`}
+                          gpu={gpu}
+                          index={gpu.index}
+                          agentName={gpuData[0].agentName}
+                          onClick={() => handleGpuClick(agentId, gpuData[0].agentName, gpu, gpu.index)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Unreachable agents */}
+              {unreachableAgents.map(({ agent }) => (
+                <div key={agent.id} className="agent-section agent-section-unreachable">
                   <div className="agent-section-header">
-                    <h3>{gpuData[0].agentName}</h3>
-                    <span className="agent-endpoint">{agent?.url || ''}</span>
-                    <span className={`agent-status-badge ${agent?.status || ''}`}>
-                      {getAgentStatusBadge(agent?.status)}
+                    <h3>{agent.name}</h3>
+                    <span className="agent-endpoint">{agent.url}</span>
+                    <span className={`agent-status-badge ${agent.status}`}>
+                      {getAgentStatusBadge(agent.status)}
                     </span>
                   </div>
-                  <div className="gpu-grid">
-                    {gpuData.map(({ gpu }, idx) => (
-                      <GpuCard
-                        key={`${agentId}-gpu-${gpu.index}`}
-                        gpu={gpu}
-                        index={gpu.index}
-                        agentName={gpuData[0].agentName}
-                        onClick={() => handleGpuClick(agentId, gpuData[0].agentName, gpu, gpu.index)}
-                      />
-                    ))}
-                  </div>
+                  {agent.lastError && (
+                    <div className="unreachable-error">
+                      <span className="unreachable-error-icon">!</span>
+                      {agent.lastError}
+                    </div>
+                  )}
                 </div>
-              );
-            })
+              ))}
+            </>
           )}
         </div>
       </div>

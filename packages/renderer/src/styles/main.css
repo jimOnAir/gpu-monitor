@@ -190,6 +190,51 @@ body {
   color: white;
 }
 
+/* Unreachable agent sections */
+.agent-section-unreachable {
+  opacity: 0.55;
+  border: 1px dashed var(--border-color);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  filter: saturate(0.5);
+}
+
+.agent-section-unreachable .agent-section-header h3 {
+  color: var(--text-muted);
+}
+
+.agent-section-unreachable .agent-endpoint {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.unreachable-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-top: var(--spacing-sm);
+  background-color: var(--error-bg);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-small);
+  color: var(--error-text);
+}
+
+.unreachable-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--error-text);
+  color: var(--bg-primary);
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
 /* GPU Container */
 .gpu-container {
   display: flex;
