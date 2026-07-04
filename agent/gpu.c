@@ -21,7 +21,7 @@
 #define HOTSPOT_REGISTER_OFFSET 0x0002046C
 #define VRAM_REGISTER_OFFSET 0x0000E2A8
 
-static nvmlDevice_t devices[16];
+static nvmlDevice_t *devices = NULL;
 static unsigned int device_count = 0;
 
 int nvml_init(void) {
@@ -34,13 +34,29 @@ int nvml_init(void) {
 }
 
 void nvml_cleanup(void) {
+    if (devices) {
+        free(devices);
+        devices = NULL;
+    }
     nvmlShutdown();
 }
 
 unsigned int nvml_get_gpu_count(void) {
+    /* Only allocate handles once — device count is static for the lifetime of the daemon */
+    if (devices) {
+        return device_count;
+    }
     nvmlDeviceGetCount_v2(&device_count);
-    for (unsigned int i = 0; i < device_count; i++) {
-        nvmlDeviceGetHandleByIndex(i, &devices[i]);
+    if (device_count > 0) {
+        devices = (nvmlDevice_t *)malloc(device_count * sizeof(nvmlDevice_t));
+        if (!devices) {
+            log_error("Failed to allocate %u GPU handles", device_count);
+            device_count = 0;
+            return 0;
+        }
+        for (unsigned int i = 0; i < device_count; i++) {
+            nvmlDeviceGetHandleByIndex(i, &devices[i]);
+        }
     }
     return device_count;
 }

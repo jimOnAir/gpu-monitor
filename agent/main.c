@@ -37,7 +37,7 @@
 #define DEFAULT_PORT 8080
 #define BUFFER_SIZE 8192
 
-static struct GpuData gpus[16];
+static struct GpuData *gpus = NULL;
 static unsigned int gpu_count = 0;
 static volatile int running = 1;
 
@@ -260,6 +260,15 @@ int main(int argc, char *argv[]) {
         log_info("  GPU %d: %s", i, name);
     }
 
+    // Allocate GPU data array dynamically
+    gpus = (struct GpuData *)malloc(gpu_count * sizeof(struct GpuData));
+    if (!gpus) {
+        log_error("Failed to allocate %u GPU data structures", gpu_count);
+        nvml_cleanup();
+        return 1;
+    }
+    memset(gpus, 0, gpu_count * sizeof(struct GpuData));
+
     // Discover board identities (one-time, cached for lifetime)
     log_info("Discovering GPU board identities...");
     for (int i = 0; i < gpu_count; i++) {
@@ -282,9 +291,52 @@ int main(int argc, char *argv[]) {
     // Start HTTP server
     int port = DEFAULT_PORT;
     if (argc > 1) {
-        port = atoi(argv[1]);
+        if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
+            printf("Usage: gputempd [port]\n"
+                   "\n"
+                   "GPU temperature daemon — reads Core/Junction/VRAM temps via NVML + /dev/mem.\n"
+                   "\n"
+                   "Options:\n"
+                   "  port      HTTP port (default: 8080, or GPUTEMP_PORT env var)\n"
+                   "  --help    Show this help message\n"
+                   "\n"
+                   "Environment:\n"
+                   "  GPUTEMP_PORT         - HTTP port\n"
+                   "  GPUTEMP_LOG_LEVEL    - Log level: DEBUG, INFO, WARN, ERROR\n"
+                   "  GPUTEMP_CORE_WARN    - Core temp warning threshold (default: 70)\n"
+                   "  GPUTEMP_CORE_DANGER  - Core temp danger threshold (default: 85)\n"
+                   "  GPUTEMP_JUNCTION_WARN  - Junction temp warning threshold (default: 80)\n"
+                   "  GPUTEMP_JUNCTION_DANGER  - Junction temp danger threshold (default: 95)\n"
+                   "  GPUTEMP_VRAM_WARN    - VRAM temp warning threshold (default: 80)\n"
+                   "  GPUTEMP_VRAM_DANGER  - VRAM temp danger threshold (default: 95)\n"
+                   "\n"
+                   "API:\n"
+                   "  GET /gpu     - JSON {timestamp, gpus: [...]}\n"
+                   "  GET /health  - {\"status\":\"ok\"}\n"
+                   "\n"
+                   "Note: Junction/VRAM temps require `iomem=relaxed` kernel parameter.\n");
+            nvml_cleanup();
+            return 0;
+        }
+        // Validate port: must be all digits
+        char *endptr;
+        long port_val = strtol(argv[1], &endptr, 10);
+        if (*endptr != '\0' || port_val < 1 || port_val > 65535) {
+            fprintf(stderr, "Error: invalid port '%s'. Must be 1-65535.\n", argv[1]);
+            nvml_cleanup();
+            return 1;
+        }
+        port = (int)port_val;
     } else if (getenv("GPUTEMP_PORT")) {
-        port = atoi(getenv("GPUTEMP_PORT"));
+        char *env_port = getenv("GPUTEMP_PORT");
+        char *ep;
+        long port_val = strtol(env_port, &ep, 10);
+        if (*ep != '\0' || port_val < 1 || port_val > 65535) {
+            fprintf(stderr, "Error: invalid GPUTEMP_PORT '%s'. Must be 1-65535.\n", env_port);
+            nvml_cleanup();
+            return 1;
+        }
+        port = (int)port_val;
     }
 
     log_info("Starting HTTP server on port %d", port);
@@ -306,6 +358,8 @@ int main(int argc, char *argv[]) {
     }
 
     log_info("Shutting down");
+    free(gpus);
+    gpus = NULL;
     MHD_stop_daemon(daemon);
     nvml_cleanup();
 
