@@ -94,14 +94,20 @@ packages/
 ├── shared/         # Types + enums only (no implementation). tsc → dist/
 │   └── src/{types, enums}/
 ├── main/           # Electron main process. esbuild → dist/
-│   └── src/{main.ts, preload.ts, logger.ts}
+│   └── src/{
+│       main.ts, preload.ts, logger.ts, settings.ts,
+│       infrastructure/ipc/,
+│       *.test.ts
+│   }
 └── renderer/       # React UI. webpack → dist/
     └── src/{
         index.tsx, App.tsx,
         components/{GpuCard, GpuDetailModal, Footer, SettingsModal, DebugPanel, GpuBar},
         domains/dashboard/DashboardService,
         styles/main.css,
-        preload.d.ts
+        types/AgentState.ts,
+        preload.d.ts,
+        *.test.tsx
     }
 ```
 

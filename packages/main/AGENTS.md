@@ -12,9 +12,11 @@ Electron main process — manages application lifecycle, agent polling (Node.js 
 - Settings stored at `~/.config/gpu-monitor/settings.json` (gitignored)
 - Preload script (`preload.ts`) exposes safe IPC bridges to the renderer
 - Logger in `logger.ts` handles main-process logging
+- **Settings validation**: Zod schema in `settings.ts` — `settingsSchema.parse()` for runtime validation
 - **Agent polling**: `http.get()` to agent `/gpu` + `/health` endpoints, `Promise.allSettled` for parallel polling
 - **Stale detection**: runs every 5s, independent of polling interval
 - **NotificationService**: evaluates per-GPU temperature thresholds, manages per-trigger cooldowns, fires `Electron.Notification`
+- **IPC infrastructure**: `infrastructure/ipc/` handles IPC event registration
 - Tray icon and tooltip update are internal to main process (no IPC needed)
 
 ## Work Guidance
