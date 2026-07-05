@@ -2,6 +2,7 @@ import type { IGpu } from '@gpu-monitor/shared';
 import React from 'react';
 
 import { GpuBar } from './GpuBar';
+import { getGpuUtilizationStatus, getMemoryStatus, getPowerStatus, GB } from '../utils/constants';
 
 interface GpuCardProps {
   gpu: IGpu;
@@ -41,9 +42,9 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName: _agentN
 
       {/* Temperature Section */}
       <div className="gpu-card-section">
-        <GpuRow label="Core" value={gpu.coreTemp} max={100} unit="°C" status={gpu.coreStatus} />
-        <GpuRow label="Junction" value={gpu.junctionTemp} max={100} unit="°C" status={gpu.junctionStatus} />
-        <GpuRow label="VRAM" value={gpu.vramTemp} max={100} unit="°C" status={gpu.vramStatus} />
+        <GpuRow label="Core" value={gpu.coreTemp} max={100} unit="°C" status={gpu.coreStatus ?? 'normal'} />
+        <GpuRow label="Junction" value={gpu.junctionTemp} max={100} unit="°C" status={gpu.junctionStatus ?? 'normal'} />
+        <GpuRow label="VRAM" value={gpu.vramTemp} max={100} unit="°C" status={gpu.vramStatus ?? 'normal'} />
       </div>
 
       {/* Separator */}
@@ -58,7 +59,7 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName: _agentN
           value={gpu.gpuUtilization}
           max={100}
           unit="%"
-          status={gpu.gpuUtilization > 90 ? 'danger' : gpu.gpuUtilization > 70 ? 'warning' : 'normal'}
+          status={getGpuUtilizationStatus(gpu.gpuUtilization)}
         />
         <GpuRow
           label="Memory"
@@ -73,13 +74,7 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName: _agentN
           value={gpu.powerUsage}
           max={gpu.powerCapW ?? 1000} // Use power cap if available, fallback 1000W
           unit="W"
-          status={
-            gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.9
-              ? 'danger'
-              : gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.7
-                ? 'warning'
-                : gpu.powerUsage > 800 ? 'danger' : gpu.powerUsage > 600 ? 'warning' : 'normal'
-          }
+          status={getPowerStatus(gpu.powerUsage, gpu.powerCapW)}
           showDetail
         />
       </div>
@@ -112,8 +107,6 @@ const GpuRow: React.FC<GpuRowProps> = ({ label, value, max, unit, status, showDe
   </div>
 );
 
-const GB = 1024 * 1024 * 1024;
-
 export function formatValue(value: number, max: number, unit: string, showDetail?: boolean): string {
   if (showDetail) {
     return `${value.toFixed(0)}/${max.toFixed(0)}${unit}`;
@@ -126,16 +119,4 @@ export function formatValue(value: number, max: number, unit: string, showDetail
   }
 
   return `${Math.round(value)}${unit}`;
-}
-
-export function getMemoryStatus(used: number, total: number): 'normal' | 'warning' | 'danger' {
-  const ratio = used / total;
-  if (ratio > 0.9) {
-    return 'danger';
-  }
-  if (ratio > 0.7) {
-    return 'warning';
-  }
-
-  return 'normal';
 }

@@ -50,8 +50,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ agentState, visible, onT
           return (
             <div key={agent.id} className="debug-agent">
               <div className="debug-agent-header">
-                <span className={`debug-agent-status ${agent.status}`}>
-                  {agent.status.toUpperCase()}
+                <span className={`debug-agent-status ${agent.status ?? 'unknown'}`}>
+                  {(agent.status ?? 'unknown').toUpperCase()}
                 </span>
                 <span className="debug-agent-name">{agent.name}</span>
                 <span

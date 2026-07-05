@@ -51,6 +51,49 @@ const char* determine_status(double temp, double warn, double danger) {
     return "normal";
 }
 
+/**
+ * Write a JSON-escaped copy of a string to the output buffer.
+ * Escapes: \, ", and control characters (using \uXXXX notation).
+ * Returns the number of bytes written (excluding null terminator).
+ */
+int json_escape_string(const char *src, char *dst, size_t dst_size) {
+    size_t i = 0;
+    size_t j = 0;
+    
+    while (src[i] && j < dst_size - 1) {
+        char c = src[i];
+        
+        if (c == '\\' || c == '"') {
+            if (j + 2 >= dst_size) break;
+            dst[j++] = '\\';
+            dst[j++] = c;
+        } else if (c == '\n') {
+            if (j + 2 >= dst_size) break;
+            dst[j++] = '\\';
+            dst[j++] = 'n';
+        } else if (c == '\r') {
+            if (j + 2 >= dst_size) break;
+            dst[j++] = '\\';
+            dst[j++] = 'r';
+        } else if (c == '\t') {
+            if (j + 2 >= dst_size) break;
+            dst[j++] = '\\';
+            dst[j++] = 't';
+        } else if ((unsigned char)c < 0x20) {
+            // Control characters: \uXXXX
+            if (j + 6 >= dst_size) break;
+            snprintf(dst + j, 7, "\\u%04x", (unsigned char)c);
+            j += 6;
+        } else {
+            if (j + 1 >= dst_size) break;
+            dst[j++] = c;
+        }
+        i++;
+    }
+    dst[j] = '\0';
+    return (int)j;
+}
+
 void fill_gpu_status(struct GpuData *gpu, int index) {
     // NVML provides core temp, utilization, memory, power
     if (nvml_gpu_exists(index)) {
@@ -126,6 +169,22 @@ char* generate_json_response(void) {
             }
         }
 
+        // Escape all string fields for safe JSON embedding
+        char escaped_uuid[128], escaped_name[256], escaped_core_status[32];
+        char escaped_junction_status[32], escaped_vram_status[32];
+        char escaped_driver_version[128], escaped_vendor[128];
+        char escaped_model[128], escaped_part_number[128];
+
+        json_escape_string(gpu->uuid, escaped_uuid, sizeof(escaped_uuid));
+        json_escape_string(gpu->name, escaped_name, sizeof(escaped_name));
+        json_escape_string(gpu->coreStatus, escaped_core_status, sizeof(escaped_core_status));
+        json_escape_string(gpu->junctionStatus, escaped_junction_status, sizeof(escaped_junction_status));
+        json_escape_string(gpu->vramStatus, escaped_vram_status, sizeof(escaped_vram_status));
+        json_escape_string(gpu->driverVersion, escaped_driver_version, sizeof(escaped_driver_version));
+        json_escape_string(gpu->vendor, escaped_vendor, sizeof(escaped_vendor));
+        json_escape_string(gpu->model, escaped_model, sizeof(escaped_model));
+        json_escape_string(gpu->partNumber, escaped_part_number, sizeof(escaped_part_number));
+
         offset += snprintf(response + offset, (size_t)remaining,
             "{\"uuid\":\"%s\",\"index\":%d,\"name\":\"%s\","
             "\"coreTemp\":%.1f,\"junctionTemp\":%.1f,\"vramTemp\":%.1f,"
@@ -135,9 +194,9 @@ char* generate_json_response(void) {
             "\"tempShutdown\":%d,\"tempSlowdown\":%d,\"powerCapW\":%.1f,"
             "\"driverVersion\":\"%s\",\"perfState\":%d,"
             "\"vendor\":\"%s\",\"model\":\"%s\",\"partNumber\":\"%s\"}",
-            gpu->uuid,
+            escaped_uuid,
             gpu->index,
-            gpu->name,
+            escaped_name,
             gpu->coreTemp,
             gpu->junctionTemp,
             gpu->vramTemp,
@@ -145,20 +204,20 @@ char* generate_json_response(void) {
             gpu->memoryUsed,
             gpu->memoryTotal,
             gpu->powerUsage,
-            gpu->coreStatus,
-            gpu->junctionStatus,
-            gpu->vramStatus,
+            escaped_core_status,
+            escaped_junction_status,
+            escaped_vram_status,
             gpu->fanSpeed,
             gpu->gpuClockMHz,
             gpu->memClockMHz,
             gpu->tempShutdown,
             gpu->tempSlowdown,
             gpu->powerCapW,
-            gpu->driverVersion,
+            escaped_driver_version,
             gpu->perfState,
-            gpu->vendor,
-            gpu->model,
-            gpu->partNumber
+            escaped_vendor,
+            escaped_model,
+            escaped_part_number
         );
 
         if (offset < 0 || (size_t)offset >= buf_size) {

@@ -4,7 +4,7 @@ export interface IAgent {
   id: string;
   name: string;
   url: string;
-  status: EAgentStatus;
+  status?: EAgentStatus;
   lastError?: string;
   lastUpdate?: number;
 }

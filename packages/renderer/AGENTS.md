@@ -13,7 +13,9 @@ React-based GPU monitoring dashboard. Displays clickable GPU cards with temp/uti
 - CSS is in `src/styles/main.css`
 - Domain services are platform-agnostic (no Electron imports in `domains/`)
 - No polling — receives `gpu-data-update` via IPC from main process
-- `preload.d.ts` defines the Electron API surface for the renderer
+- `preload.d.ts` re-exports IPC types from `@gpu-monitor/shared` (`IElectronAPI`, `GpuDataPayload`, `FetchResult`)
+- Shared constants in `utils/constants.ts` — `GB` and status helpers (`getMemoryStatus`, `getPowerStatus`, `getGpuUtilizationStatus`); threshold values are internal to the module; imported by `GpuCard`, `GpuDetailModal`, and tests
+- App uses `GpuDataPayload` (from `@gpu-monitor/shared`) for the IPC payload type directly
 
 ## Work Guidance
 
@@ -47,6 +49,9 @@ App.tsx (root orchestrator)
 
 ### Domain Services
 - `domains/dashboard/DashboardService.ts` — cross-agent aggregation
+
+### Utilities
+- `utils/constants.ts` — status helpers (`getMemoryStatus`, `getPowerStatus`, `getGpuUtilizationStatus`) and `GB` constant. Threshold values (memory ratios, power ratios, absolute power) are internal. `getGpuUtilizationStatus` replaces inline threshold checks in `GpuCard` and `GpuDetailModal`. Imported by `GpuCard`, `GpuDetailModal`, and their tests.
 
 ### Building
 ```bash

@@ -11,6 +11,7 @@ Production C daemon that reads GPU temperatures via NVML and /dev/mem mmap (for 
 - GPU count is dynamic — arrays allocated via `malloc` after detection, no fixed cap
 - JSON response buffer scales dynamically: `(1 + (gpu_count + 7) / 8) * BUFFER_SIZE`
 - CORS is wildcard (`*`) in production code (`main.c:179`)
+- **JSON string fields escaped** via `json_escape_string()` — all string values (name, uuid, vendor, model, etc.) go through this helper before `snprintf` to prevent malformed JSON from special characters
 - Junction/VRAM temps require `iomem=relaxed` kernel parameter — see `agent/README.md`
 - Power readings are in milliwatts, converted to watts at `gpu.c:108`
 - Logger subsystem in `logger.c/h` handles all logging

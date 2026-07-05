@@ -1,5 +1,6 @@
 import type { ISettings } from '@gpu-monitor/shared';
 import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
+import type { GpuDataPayload } from '@gpu-monitor/shared';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { DebugPanel } from './components/DebugPanel';
@@ -9,30 +10,7 @@ import { GpuDetailModal } from './components/GpuDetailModal';
 import { SettingsModal } from './components/SettingsModal';
 import { DashboardService } from './domains/dashboard/DashboardService';
 import './styles/main.css';
-import type { AgentState, FetchResult } from './types/AgentState';
-
-interface GpuDataPayload {
-  agents: import('@gpu-monitor/shared').IAgent[];
-  gpus: Array<{ agentId: string, gpus: import('@gpu-monitor/shared').IGpu[] }>;
-  lastUpdate: Array<[string, number]>;
-  lastFetchTimestamp: Array<[string, number]>;
-  statusChangedAt: Array<[string, number]>;
-  fetchResult: Array<[string, FetchResult]>;
-}
-
-// ---------- Window type declarations ----------
-
-declare global {
-  interface Window {
-    electronAPI?: {
-      getSettings: () => Promise<ISettings | null>,
-      saveSettings: (settings: ISettings) => Promise<boolean>,
-      onOpenSettings: (callback: () => void) => void,
-      onWindowClose: () => void,
-      onGpuDataUpdate: (callback: (data: GpuDataPayload) => void) => void,
-    };
-  }
-}
+import type { AgentState } from './types/AgentState';
 
 // ---------- Services ----------
 
@@ -98,7 +76,7 @@ export const App: React.FC = () => {
       window.electronAPI.onGpuDataUpdate((payload) => {
         console.log('GPU data update received:', {
           agentCount: payload.agents.length,
-          agents: payload.agents.map((a: { id: string, status: string }) => ({ id: a.id, status: a.status })),
+          agents: payload.agents.map((a) => ({ id: a.id, status: a.status?.toString() ?? 'unknown' as string })),
           gpuCount: payload.gpus.reduce((sum: number, g: { gpus: unknown[] }) => sum + g.gpus.length, 0),
         });
         setAgentState(buildAgentState(payload));

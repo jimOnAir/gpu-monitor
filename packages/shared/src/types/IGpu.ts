@@ -14,9 +14,9 @@ export interface IGpu {
   memoryUsed: number;
   memoryTotal: number;
   powerUsage: number;
-  coreStatus: 'normal' | 'warning' | 'danger';
-  junctionStatus: 'normal' | 'warning' | 'danger';
-  vramStatus: 'normal' | 'warning' | 'danger';
+  coreStatus?: 'normal' | 'warning' | 'danger';
+  junctionStatus?: 'normal' | 'warning' | 'danger';
+  vramStatus?: 'normal' | 'warning' | 'danger';
   /* Extended metrics (optional for backward compat with older agents) */
   fanSpeed?: number;
   gpuClockMHz?: number;

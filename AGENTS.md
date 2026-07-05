@@ -96,7 +96,7 @@ packages/
 ├── main/           # Electron main process. esbuild → dist/
 │   └── src/{
 │       main.ts, preload.ts, logger.ts, settings.ts,
-│       infrastructure/ipc/,
+│       notification-service.ts, gpu-validation.ts,
 │       *.test.ts
 │   }
 └── renderer/       # React UI. webpack → dist/
@@ -105,7 +105,7 @@ packages/
         components/{GpuCard, GpuDetailModal, Footer, SettingsModal, DebugPanel, GpuBar},
         domains/dashboard/DashboardService,
         styles/main.css,
-        types/AgentState.ts,
+        utils/constants.ts,
         preload.d.ts,
         *.test.tsx
     }
@@ -162,9 +162,12 @@ All env vars parsed **inline in `main.c`** — there is no config module.
 
 ## Key Constraints
 
-- **Shared package**: interfaces and enums only. No implementation. Imported by both `main` and `renderer`.
+- **Shared package**: interfaces, enums, and IPC types only. No implementation. Imported by both `main` and `renderer`. Contains `IElectronAPI`, `GpuDataPayload`, `FetchResult`, plus optional fields on `IAgent.status` and `IGpu` status fields.
 - **No Electron in services**: platform-agnostic code in `domains/`, inject Electron via constructor.
-- **Agent polling in main process**: main does HTTP fetching via Node.js `http` module. Renderer receives data via IPC push.
-- **Notifications in main process**: `NotificationService` evaluates thresholds and fires `Electron.Notification`. Renderer is pure display.
-- **Settings**: stored at `~/.config/gpu-monitor/settings.json` (gitignored). Shape: `{ agents: [{id, name, url}], refreshInterval, thresholds: {core|junction|vram: {warn, critical}}, notifications: {enabled, cooldownMs} }`.
+- **Agent polling in main process**: main does HTTP fetching via Node.js `http` module. Raw responses validated via `gpu-validation.ts` Zod schemas before processing. Renderer receives data via IPC push.
+- **Notifications in main process**: `NotificationService` (in `notification-service.ts`) evaluates per-metric thresholds (core/junction/vram independently) and fires `Electron.Notification`. Renderer is pure display.
+- **GPU data validation**: all raw agent responses validated through `validateGpuResponse()` before being stored or used in notifications.
+- **Tray icon**: uses per-metric evaluation — junction/vram critical temps override core-only normal state.
+- **Settings**: stored at `~/.config/gpu-monitor/settings.json` (gitignored). Shape: `{ agents: [{id, name, url}], refreshInterval, thresholds: {core|junction|vram: {warn, critical}}, notifications: {enabled, cooldownMs} }`. Agent URLs validated to http(s) only via `agentUrlSchema`.
+- **Shared constants**: `utils/constants.ts` centralizes `GB` and status helpers (`getMemoryStatus`, `getPowerStatus`, `getGpuUtilizationStatus`). Threshold values are internal to the module. Imported by `GpuCard`, `GpuDetailModal`, and tests.
 - **Docs**: Obsidian vault format with wiki-links in `docs/`. The Electron App doc has the full implementation spec.

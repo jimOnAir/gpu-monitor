@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { EAgentStatus } from '@gpu-monitor/shared';
+
 const tempThresholdSchema = z.object({
   warn: z.number(),
   critical: z.number(),
@@ -19,12 +21,25 @@ const notificationsConfigSchema = z.object({
   cooldowns: notificationCooldownsSchema,
 });
 
+const agentUrlSchema = z.string().refine(
+  (url) => {
+    try {
+      const parsed = new URL(url);
+
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  },
+  { message: 'URL must be http:// or https://' },
+);
+
 export const settingsSchema = z.object({
   agents: z.array(z.object({
     id: z.string(),
     name: z.string(),
-    url: z.string().url(),
-    status: z.string().optional(),
+    url: agentUrlSchema,
+    status: z.nativeEnum(EAgentStatus).optional(),
     lastError: z.string().optional(),
     lastUpdate: z.number().optional(),
   })),

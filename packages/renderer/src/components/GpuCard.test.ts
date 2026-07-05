@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
-import { formatValue, getMemoryStatus } from './GpuCard';
+import { formatValue } from './GpuCard';
+import { getMemoryStatus } from '../utils/constants';
 
 describe('formatValue', () => {
   it('shows detail format when showDetail is true', () => {

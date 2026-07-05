@@ -3,6 +3,7 @@ import { EAgentStatus } from '@gpu-monitor/shared';
 import React from 'react';
 
 import { GpuBar } from './GpuBar';
+import { GB, getGpuUtilizationStatus, getMemoryStatus, getPowerStatus } from '../utils/constants';
 
 interface GpuDetailModalProps {
   gpu: IGpu;
@@ -187,21 +188,21 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                 <TempRow
                   label="Core"
                   value={gpu.coreTemp}
-                  status={gpu.coreStatus}
+                  status={gpu.coreStatus ?? 'normal'}
                   shutdown={gpu.tempShutdown}
                   slowdown={gpu.tempSlowdown}
                 />
                 <TempRow
                   label="Junction"
                   value={gpu.junctionTemp}
-                  status={gpu.junctionStatus}
+                  status={gpu.junctionStatus ?? 'normal'}
                   shutdown={gpu.tempShutdown}
                   slowdown={gpu.tempSlowdown}
                 />
                 <TempRow
                   label="VRAM"
                   value={gpu.vramTemp}
-                  status={gpu.vramStatus}
+                  status={gpu.vramStatus ?? 'normal'}
                   shutdown={gpu.tempShutdown}
                   slowdown={gpu.tempSlowdown}
                 />
@@ -249,27 +250,15 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   value={gpu.gpuUtilization}
                   max={100}
                   unit="%"
-                  status={
-                    gpu.gpuUtilization > 90
-                      ? 'danger'
-                      : gpu.gpuUtilization > 70
-                        ? 'warning'
-                        : 'normal'
-                  }
+                  status={getGpuUtilizationStatus(gpu.gpuUtilization)}
                 />
                 <MetricBar
                   label="Memory Used"
-                  value={gpu.memoryUsed / (1024 * 1024 * 1024)}
-                  max={gpu.memoryTotal / (1024 * 1024 * 1024)}
+                  value={gpu.memoryUsed / GB}
+                  max={gpu.memoryTotal / GB}
                   unit=" GB"
-                  status={
-                    gpu.memoryUsed / gpu.memoryTotal > 0.9
-                      ? 'danger'
-                      : gpu.memoryUsed / gpu.memoryTotal > 0.7
-                        ? 'warning'
-                        : 'normal'
-                  }
-                  hint={`${((gpu.memoryUsed / gpu.memoryTotal) * 100).toFixed(1)}% of ${(gpu.memoryTotal / (1024 * 1024 * 1024)).toFixed(1)} GB`}
+                  status={getMemoryStatus(gpu.memoryUsed, gpu.memoryTotal)}
+                  hint={`${((gpu.memoryUsed / gpu.memoryTotal) * 100).toFixed(1)}% of ${(gpu.memoryTotal / GB).toFixed(1)} GB`}
                 />
               </div>
             </GpuSection>
@@ -282,13 +271,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   value={gpu.powerUsage}
                   max={gpu.powerCapW || 400}
                   unit=" W"
-                  status={
-                    gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.9
-                      ? 'danger'
-                      : gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.7
-                        ? 'warning'
-                        : 'normal'
-                  }
+                  status={getPowerStatus(gpu.powerUsage, gpu.powerCapW)}
                   hint={gpu.powerCapW ? `Cap: ${gpu.powerCapW.toFixed(0)}W` : undefined}
                 />
               </div>

@@ -10,14 +10,14 @@ Electron main process — manages application lifecycle, agent polling (Node.js 
 - Bundled with **esbuild** via `scripts/build-esbuild.js` — not webpack, not tsc alone
 - Tray icons are generated programmatically at build time by `scripts/generate-icons.js` (pure Node.js, no deps)
 - Settings stored at `~/.config/gpu-monitor/settings.json` (gitignored)
-- Preload script (`preload.ts`) exposes safe IPC bridges to the renderer
+- Preload script (`preload.ts`) exposes safe IPC bridges to the renderer — types come from `@gpu-monitor/shared` (`IElectronAPI`)
 - Logger in `logger.ts` handles main-process logging
-- **Settings validation**: Zod schema in `settings.ts` — `settingsSchema.parse()` for runtime validation
-- **Agent polling**: `http.get()` to agent `/gpu` + `/health` endpoints, `Promise.allSettled` for parallel polling
+- **Settings validation**: Zod schema in `settings.ts` — `settingsSchema.parse()` for runtime validation; agent URLs validated via `agentUrlSchema` (http/https only, rejects `file://`)
+- **GPU data validation**: Zod schemas in `gpu-validation.ts` — validates raw agent responses before processing (`validateGpuResponse()`)
+- **Agent polling**: `http.get()` to agent `/gpu` + `/health` endpoints, `Promise.allSettled` for parallel polling; raw responses validated through `classifyResult()` → `validateGpuResponse()` pipeline
 - **Stale detection**: runs every 5s, independent of polling interval
-- **NotificationService**: evaluates per-GPU temperature thresholds, manages per-trigger cooldowns, fires `Electron.Notification`
-- **IPC infrastructure**: `infrastructure/ipc/` handles IPC event registration
-- Tray icon and tooltip update are internal to main process (no IPC needed)
+- **NotificationService**: lives in `notification-service.ts` — evaluates per-GPU temperature thresholds (core/junction/vram with per-metric thresholds), manages per-trigger cooldowns, fires `Electron.Notification`; exports `NotificationService`, `AgentData`, `FetchResult`, and `Settings` types
+- Tray icon and tooltip update are internal to main process (no IPC needed); tray uses per-metric evaluation (`getTempState()` + `worstState()`) so junction/vram critical temps override core-only normal state
 
 ## Work Guidance
 
@@ -45,8 +45,8 @@ Build icon (`build/icons/icon.png`) is 256×256, loaded by `loadBuildIcon()` in 
 Notifications respect `settings.notifications.enabled` and use per-trigger cooldowns keyed by `(type, agentId, metric)`.
 
 ### IPC Events
-- **Main → Renderer**: `gpu-data-update` — pushes full agent+GPU state on every poll cycle
-- **Renderer → Main**: `get-settings`, `save-settings`, `on-window-close`, `on-open-settings`
+- **Main → Renderer**: `gpu-data-update` — pushes full agent+GPU state on every poll cycle. Payload shape: `GpuDataPayload` (from `@gpu-monitor/shared`)
+- **Renderer → Main**: `get-settings`, `save-settings`, `on-window-close`, `on-open-settings` — types defined in `@gpu-monitor/shared` (`IElectronAPI`)
 - Tray menu "Refresh Agents" calls polling directly (no IPC round-trip)
 
 ### Building
@@ -84,10 +84,13 @@ npx fallow audit --base HEAD
 ```
 
 Key rules:
-- `evaluateAndNotify` and `gatherMetrics` must stay below CC20 — split further if they grow
+- NotificationService methods in `notification-service.ts` must stay below CC20 — split further if they grow
 - All `fetchJson` calls must use the generic form `fetchJson<T>(url)` — no `as` casts on results
+- All fetched GPU data must pass through `validateGpuResponse()` before being used
 - Settings validation uses Zod schema (`settingsSchema.parse()`) — never `typeof` checks
+- Agent URLs validated via `agentUrlSchema` (http/https only) — never accept `file://` or other schemes
 - Notification dispatch is split into `dispatchMetric` / `dispatchAgentTransition` / `dispatchAllRecovered` — keep that boundary
+- Tray icon uses per-metric thresholds (`getTempState()` + `worstState()`) — never compare junction/vram temps against core thresholds
 - No `!` non-null assertions in polling path — use discriminated unions or null checks
 
 ## Child DOX Index

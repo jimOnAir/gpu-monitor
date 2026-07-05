@@ -21,11 +21,14 @@ npm run build:shared
 Runs `tsc` against `tsconfig.json`, outputs to `dist/`.
 
 ### Key Types
-- `IGpu` — GPU identity, temps, utilization, power
-- `IAgent` — agent endpoint configuration
+- `IGpu` — GPU identity, temps, utilization, power; optional fields: `fanSpeed`, `coreStatus`/`junctionStatus`/`vramStatus` (use `?? 'normal'` default in consumers)
+- `IAgent` — agent endpoint configuration; `status` is optional (defaults handled by main process)
 - `ISettings` — app settings (agents list, refresh interval, thresholds, notifications config)
 - `INotificationsConfig` — notifications settings (enabled, cooldownMs)
 - `EAgentStatus` — enum for agent connection states
+- `IElectronAPI` — type-safe IPC surface exposed via `contextBridge`; consumed by both `preload.ts` and renderer
+- `GpuDataPayload` — payload shape for `gpu-data-update` IPC events
+- `FetchResult` — `'pending' | 'ok' | 'fetch-failed' | 'health-failed' | 'error'`
 
 ## Verification
 
