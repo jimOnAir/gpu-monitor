@@ -1,4 +1,6 @@
-import { IAgent, IGpu, EAgentStatus, ISettings } from '@gpu-monitor/shared';
+import type { IAgent, IGpu, ISettings } from '@gpu-monitor/shared';
+import { EAgentStatus } from '@gpu-monitor/shared';
+
 import { AgentRepository } from './AgentRepository';
 import { logger } from './logger';
 
@@ -9,24 +11,24 @@ export type FetchResult = 'pending' | 'ok' | 'fetch-failed' | 'health-failed' | 
 export interface AgentState {
   agents: IAgent[];
   gpus: Map<string, IGpu[]>;
-  lastUpdate: Map<string, number>;              // when last successful fetch completed (for stale detection)
-  lastFetchTimestamp: Map<string, number>;      // exact timestamp of last fetch (for display)
-  statusChangedAt: Map<string, number>;         // when status last changed (for footer "last updated")
+  lastUpdate: Map<string, number>; // when last successful fetch completed (for stale detection)
+  lastFetchTimestamp: Map<string, number>; // exact timestamp of last fetch (for display)
+  statusChangedAt: Map<string, number>; // when status last changed (for footer "last updated")
   fetchResult: Map<string, FetchResult>;
 }
 
 export class AgentService {
   private agents: IAgent[] = [];
-  private gpus: Map<string, IGpu[]> = new Map();
-  private lastUpdate: Map<string, number> = new Map();
-  private lastFetchTimestamp: Map<string, number> = new Map();
-  private statusChangedAt: Map<string, number> = new Map();
-  private fetchResult: Map<string, FetchResult> = new Map();
+  private gpus = new Map<string, IGpu[]>();
+  private lastUpdate = new Map<string, number>();
+  private lastFetchTimestamp = new Map<string, number>();
+  private statusChangedAt = new Map<string, number>();
+  private fetchResult = new Map<string, FetchResult>();
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private fetchIntervalId: ReturnType<typeof setInterval> | null = null;
   private listeners: StateListener[] = [];
-  private pollingAgents: Set<string> = new Set();
-  private refreshIntervalMs: number = 5000;
+  private pollingAgents = new Set<string>();
+  private refreshIntervalMs = 5000;
   private repository: AgentRepository;
 
   constructor(repository?: AgentRepository) {
@@ -36,6 +38,7 @@ export class AgentService {
   subscribe(listener: StateListener): () => void {
     this.listeners.push(listener);
     listener(this.getState());
+
     return () => {
       this.listeners = this.listeners.filter((l) => l !== listener);
     };
@@ -86,7 +89,20 @@ export class AgentService {
 
   refreshAll(): void {
     logger.debug('AgentService', undefined, 'refreshAll() called');
-    this.agents.forEach((agent) => this.pollAgent(agent));
+    this.agents.forEach(async (agent) => this.pollAgent(agent));
+  }
+
+  stopPolling(): void {
+    if (this.intervalId !== null) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+      logger.info('AgentService', undefined, 'Stale check interval stopped');
+    }
+    if (this.fetchIntervalId !== null) {
+      clearInterval(this.fetchIntervalId);
+      this.fetchIntervalId = null;
+      logger.info('AgentService', undefined, 'Fetch interval stopped');
+    }
   }
 
   private async pollAgent(agent: IAgent): Promise<void> {
@@ -103,6 +119,7 @@ export class AgentService {
         this.fetchResult.set(agent.id, 'fetch-failed');
         this.setAgentStatus(agent.id, EAgentStatus.Offline, 'Failed to fetch data');
         this.notify();
+
         return;
       }
 
@@ -114,6 +131,7 @@ export class AgentService {
         this.fetchResult.set(agent.id, 'health-failed');
         this.setAgentStatus(agent.id, EAgentStatus.Offline, 'Health check failed');
         this.notify();
+
         return;
       }
 
@@ -125,7 +143,7 @@ export class AgentService {
       this.lastUpdate.set(agent.id, now);
       this.lastFetchTimestamp.set(agent.id, now);
       this.fetchResult.set(agent.id, 'ok');
-      
+
       // Only transition status if currently Stale or Offline
       const currentStatus = this.getAgentStatus(agent.id);
       if (currentStatus === EAgentStatus.Stale || currentStatus === EAgentStatus.Offline) {
@@ -166,30 +184,20 @@ export class AgentService {
     logger.info('AgentService', undefined, `Polling started: fetch every ${intervalMs}ms, stale check every ${STALE_CHECK_INTERVAL_MS}ms`);
   }
 
-  stopPolling(): void {
-    if (this.intervalId !== null) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-      logger.info('AgentService', undefined, 'Stale check interval stopped');
-    }
-    if (this.fetchIntervalId !== null) {
-      clearInterval(this.fetchIntervalId);
-      this.fetchIntervalId = null;
-      logger.info('AgentService', undefined, 'Fetch interval stopped');
-    }
-  }
-
   private checkStale(): void {
     const now = Date.now();
     const staleThreshold = Math.max(this.refreshIntervalMs * 3, MIN_STALE_THRESHOLD_MS);
     let changed = false;
 
     this.agents.forEach((agent) => {
-      if (this.pollingAgents.has(agent.id)) return;
+      if (this.pollingAgents.has(agent.id)) {
+        return;
+      }
 
       const lastUpdate = this.lastUpdate.get(agent.id);
       if (!lastUpdate) {
         logger.debug('AgentService', agent.name, 'checkStale: no lastUpdate, skipping');
+
         return;
       }
 
@@ -216,6 +224,7 @@ export class AgentService {
 
   private getAgentStatus(agentId: string): EAgentStatus {
     const agent = this.agents.find((a) => a.id === agentId);
+
     return agent?.status || EAgentStatus.Offline;
   }
 
@@ -230,7 +239,9 @@ export class AgentService {
 
   private notify(): void {
     const state = this.getState();
-    this.listeners.forEach((listener) => listener(state));
+    this.listeners.forEach((listener) => {
+      listener(state);
+    });
   }
 }
 

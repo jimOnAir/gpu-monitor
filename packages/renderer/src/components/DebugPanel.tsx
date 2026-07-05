@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { AgentState, FetchResult } from '../domains/agents/AgentService';
-import { logger, LogEntry } from '../domains/agents/logger';
+
+import type { AgentState, FetchResult } from '../domains/agents/AgentService';
+import type { LogEntry } from '../domains/agents/logger';
+import { logger } from '../domains/agents/logger';
 
 interface DebugPanelProps {
   agentState: AgentState;
@@ -40,13 +42,22 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ agentState, visible, onT
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      return;
+    }
     setLogs(logger.getEntries());
-    const interval = setInterval(() => setLogs(logger.getEntries()), 1000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      setLogs(logger.getEntries());
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, [visible]);
 
-  if (!visible) return null;
+  if (!visible) {
+    return null;
+  }
 
   const now = Date.now();
 
@@ -90,7 +101,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ agentState, visible, onT
                   {ageSec !== null ? `${ageSec}s ago` : 'never'}
                   {lastUpdate && (
                     <span className="debug-value-sub">
-                      {' '}({new Date(lastUpdate).toISOString().substr(11, 12)})
+                      {' '}({new Date(lastUpdate).toISOString().substring(11, 23)})
                     </span>
                   )}
                 </span>
@@ -101,7 +112,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ agentState, visible, onT
                   {fetchAgeSec !== null ? `${fetchAgeSec}s ago` : 'never'}
                   {lastFetchTs && (
                     <span className="debug-value-sub">
-                      {' '}({new Date(lastFetchTs).toISOString().substr(11, 12)})
+                      {' '}({new Date(lastFetchTs).toISOString().substring(11, 23)})
                     </span>
                   )}
                 </span>
@@ -127,7 +138,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ agentState, visible, onT
             {logs.slice(0, 20).map((log, i) => (
               <div key={i} className={`debug-log-entry debug-log-${log.level}`}>
                 <span className="debug-log-time">
-                  {new Date(log.ts).toISOString().substr(11, 12)}
+                  {new Date(log.ts).toISOString().substring(11, 23)}
                 </span>
                 <span className="debug-log-icon" style={{ color: LOG_LEVEL_COLORS[log.level] }}>
                   [{LOG_LEVEL_ICONS[log.level]}]

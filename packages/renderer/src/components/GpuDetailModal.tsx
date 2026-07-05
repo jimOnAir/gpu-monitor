@@ -1,5 +1,7 @@
+import type { IGpu } from '@gpu-monitor/shared';
+import { EAgentStatus } from '@gpu-monitor/shared';
 import React from 'react';
-import { IGpu, EAgentStatus } from '@gpu-monitor/shared';
+
 import { GpuBar } from './GpuBar';
 
 interface GpuDetailModalProps {
@@ -49,6 +51,7 @@ interface MetricBarProps {
 
 const MetricBar: React.FC<MetricBarProps> = ({ label, value, max, unit, status, hint }) => {
   const percentage = Math.min((value / max) * 100, 100);
+
   return (
     <div className="detail-metric-bar">
       <div className="detail-metric-bar-header">
@@ -103,12 +106,25 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
   driverVersion,
   onClose,
 }) => {
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
+  const handleBackdropClick = (e?: React.MouseEvent) => {
+    if (!e || e.target === e.currentTarget) {
+      onClose();
+    }
   };
 
   return (
-    <div className="modal-backdrop" onClick={handleBackdropClick} role="dialog" aria-label={`GPU ${gpuIndex} detail`}>
+    <div
+      className="modal-backdrop"
+      onClick={handleBackdropClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          handleBackdropClick();
+        }
+      }}
+      role="dialog"
+      aria-label={`GPU ${gpuIndex} detail`}
+      tabIndex={-1}
+    >
       <div className="modal-container modal-container-detail">
         {/* Header */}
         <div className="detail-header">
@@ -237,8 +253,8 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                     gpu.gpuUtilization > 90
                       ? 'danger'
                       : gpu.gpuUtilization > 70
-                      ? 'warning'
-                      : 'normal'
+                        ? 'warning'
+                        : 'normal'
                   }
                 />
                 <MetricBar
@@ -250,8 +266,8 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                     gpu.memoryUsed / gpu.memoryTotal > 0.9
                       ? 'danger'
                       : gpu.memoryUsed / gpu.memoryTotal > 0.7
-                      ? 'warning'
-                      : 'normal'
+                        ? 'warning'
+                        : 'normal'
                   }
                   hint={`${((gpu.memoryUsed / gpu.memoryTotal) * 100).toFixed(1)}% of ${(gpu.memoryTotal / (1024 * 1024 * 1024)).toFixed(1)} GB`}
                 />
@@ -270,8 +286,8 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                     gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.9
                       ? 'danger'
                       : gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.7
-                      ? 'warning'
-                      : 'normal'
+                        ? 'warning'
+                        : 'normal'
                   }
                   hint={gpu.powerCapW ? `Cap: ${gpu.powerCapW.toFixed(0)}W` : undefined}
                 />
@@ -285,10 +301,19 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
 };
 
 export function getPerfStateLabel(pstate: number | undefined): string {
-  if (pstate === undefined) return 'N/A';
-  if (pstate === 0) return 'P0 (Max)';
-  if (pstate <= 3) return `P${pstate} (High)`;
-  if (pstate <= 6) return `P${pstate} (Mid)`;
+  if (pstate === undefined) {
+    return 'N/A';
+  }
+  if (pstate === 0) {
+    return 'P0 (Max)';
+  }
+  if (pstate <= 3) {
+    return `P${pstate} (High)`;
+  }
+  if (pstate <= 6) {
+    return `P${pstate} (Mid)`;
+  }
+
   return `P${pstate} (Low)`;
 }
 

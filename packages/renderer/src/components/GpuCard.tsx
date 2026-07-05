@@ -1,5 +1,6 @@
+import type { IGpu } from '@gpu-monitor/shared';
 import React from 'react';
-import { IGpu } from '@gpu-monitor/shared';
+
 import { GpuBar } from './GpuBar';
 
 interface GpuCardProps {
@@ -9,7 +10,7 @@ interface GpuCardProps {
   onClick?: () => void;
 }
 
-export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName, onClick }) => {
+export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName: _agentName, onClick }) => {
   return (
     <div
       className={`gpu-card${onClick ? ' gpu-card-clickable' : ''}`}
@@ -17,7 +18,11 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName, onClick
       aria-label={`GPU ${index}: ${gpu.name}`}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
-      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      onKeyDown={onClick ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault(); onClick();
+        }
+      } : undefined}
     >
       {/* Header */}
       <div className="gpu-card-header">
@@ -72,8 +77,8 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName, onClick
             gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.9
               ? 'danger'
               : gpu.powerCapW && gpu.powerUsage > gpu.powerCapW * 0.7
-              ? 'warning'
-              : gpu.powerUsage > 800 ? 'danger' : gpu.powerUsage > 600 ? 'warning' : 'normal'
+                ? 'warning'
+                : gpu.powerUsage > 800 ? 'danger' : gpu.powerUsage > 600 ? 'warning' : 'normal'
           }
           showDetail
         />
@@ -119,12 +124,18 @@ export function formatValue(value: number, max: number, unit: string, showDetail
   if (unit === 'B') {
     return `${(value / GB).toFixed(0)}GB`;
   }
+
   return `${Math.round(value)}${unit}`;
 }
 
 export function getMemoryStatus(used: number, total: number): 'normal' | 'warning' | 'danger' {
   const ratio = used / total;
-  if (ratio > 0.9) return 'danger';
-  if (ratio > 0.7) return 'warning';
+  if (ratio > 0.9) {
+    return 'danger';
+  }
+  if (ratio > 0.7) {
+    return 'warning';
+  }
+
   return 'normal';
 }

@@ -1,10 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import { AgentSection, UnreachableAgent } from './App';
 import { EAgentStatus } from '@gpu-monitor/shared';
 import type { IAgent, IGpu } from '@gpu-monitor/shared';
+import { render, screen, fireEvent } from '@testing-library/react';
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
+
+import '@testing-library/jest-dom';
+import { AgentSection, UnreachableAgent } from './App';
 
 // Mock data
 const mockAgent: IAgent = {
@@ -43,7 +44,7 @@ describe('AgentSection', () => {
         gpuData={mockGpuData}
         agent={mockAgent}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText('Test Agent')).toBeInTheDocument();
@@ -57,7 +58,7 @@ describe('AgentSection', () => {
         gpuData={mockGpuData}
         agent={{ ...mockAgent, status: EAgentStatus.Online }}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText('Online')).toBeInTheDocument();
@@ -70,7 +71,7 @@ describe('AgentSection', () => {
         gpuData={mockGpuData}
         agent={{ ...mockAgent, status: EAgentStatus.Offline }}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText('Offline')).toBeInTheDocument();
@@ -83,7 +84,7 @@ describe('AgentSection', () => {
         gpuData={mockGpuData}
         agent={{ ...mockAgent, status: EAgentStatus.Stale }}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText('Stale')).toBeInTheDocument();
@@ -96,7 +97,7 @@ describe('AgentSection', () => {
         gpuData={mockGpuData}
         agent={undefined}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText('Unknown')).toBeInTheDocument();
@@ -109,13 +110,13 @@ describe('AgentSection', () => {
         gpuData={mockGpuData}
         agent={mockAgent}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     // Should render 2 GPU cards (one for each GPU in mockGpuData)
     const gpuSectionHeader = document.querySelector('.agent-section-header');
     expect(gpuSectionHeader).toBeInTheDocument();
-    
+
     // Check that the component renders without errors
     const agentSection = document.querySelector('.agent-section');
     expect(agentSection).toBeInTheDocument();
@@ -130,7 +131,7 @@ describe('AgentSection', () => {
         gpuData={mockGpuData}
         agent={mockAgent}
         onGpuClick={onGpuClick}
-      />
+      />,
     );
 
     // Click on first GPU card
@@ -141,7 +142,7 @@ describe('AgentSection', () => {
       'agent-1',
       'Test Agent',
       mockGpu,
-      0
+      0,
     );
   });
 
@@ -152,7 +153,7 @@ describe('AgentSection', () => {
         gpuData={mockGpuData}
         agent={undefined}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     // When agent is undefined, URL should be empty string
@@ -168,7 +169,7 @@ describe('UnreachableAgent', () => {
       <UnreachableAgent
         agent={{ id: 'agent-2', name: 'Unreachable', url: 'http://localhost:9092', status: EAgentStatus.Offline }}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText('Unreachable')).toBeInTheDocument();
@@ -180,7 +181,7 @@ describe('UnreachableAgent', () => {
       <UnreachableAgent
         agent={{ id: 'agent-2', name: 'Unreachable', url: 'http://localhost:9092', status: EAgentStatus.Offline }}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText('Offline')).toBeInTheDocument();
@@ -191,7 +192,7 @@ describe('UnreachableAgent', () => {
       <UnreachableAgent
         agent={{ id: 'agent-2', name: 'Unreachable', url: 'http://localhost:9092', status: EAgentStatus.Offline }}
         onGpuClick={() => {}}
-      />
+      />,
     );
 
     const section = document.querySelector('.agent-section-unreachable');

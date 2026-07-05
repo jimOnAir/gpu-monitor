@@ -8,20 +8,24 @@ import { contextBridge, ipcRenderer } from 'electron';
  */
 contextBridge.exposeInMainWorld('electronAPI', {
   /** Load settings from disk. */
-  getSettings: (): Promise<unknown> => ipcRenderer.invoke('get-settings'),
+  getSettings: async (): Promise<unknown> => ipcRenderer.invoke('get-settings'),
 
   /** Save settings to disk. */
-  saveSettings: (settings: unknown): Promise<boolean> =>
-    ipcRenderer.invoke('save-settings', settings),
+  saveSettings: async (settings: unknown): Promise<boolean> =>
+    ipcRenderer.invoke('save-settings', settings) as Promise<boolean>,
 
   /** Trigger a manual refresh of all agents. */
   onRefreshAgents: (callback: () => void) => {
-    ipcRenderer.on('refresh-agents', () => callback());
+    ipcRenderer.on('refresh-agents', () => {
+      callback();
+    });
   },
 
   /** Open the settings modal. */
   onOpenSettings: (callback: () => void) => {
-    ipcRenderer.on('open-settings', () => callback());
+    ipcRenderer.on('open-settings', () => {
+      callback();
+    });
   },
 
   /** Close (hide) the window. */

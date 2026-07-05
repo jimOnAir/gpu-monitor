@@ -1,5 +1,6 @@
+import type { ISettings, IAgent, ITemperatureThresholds } from '@gpu-monitor/shared';
+import { EAgentStatus } from '@gpu-monitor/shared';
 import React, { useState, useEffect } from 'react';
-import { ISettings, IAgent, ITemperatureThresholds, EAgentStatus, DEFAULT_SETTINGS } from '@gpu-monitor/shared';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -26,7 +27,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [isOpen, settings]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   const handleSave = () => {
     const newSettings: ISettings = {
@@ -56,7 +59,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const updateAgent = (id: string, field: keyof IAgent, value: string) => {
     setAgents(
-      agents.map((a) => (a.id === id ? { ...a, [field]: value } : a))
+      agents.map((a) => (a.id === id ? { ...a, [field]: value } : a)),
     );
   };
 
@@ -71,8 +74,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="modal-backdrop"
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      }}
+      role="dialog"
+      aria-label="Settings"
+      tabIndex={-1}
+    >
+      <div
+        className="modal-container"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            onClose();
+          }
+        }}
+        tabIndex={-1}
+      >
         <div className="modal-header">
           <h2>Settings</h2>
           <button className="modal-close-btn" onClick={onClose}>×</button>
@@ -87,20 +112,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="text"
                   value={agent.name}
-                  onChange={(e) => updateAgent(agent.id, 'name', e.target.value)}
+                  onChange={(e) => {
+                    updateAgent(agent.id, 'name', e.target.value);
+                  }}
                   placeholder="Name"
                   className="agent-edit-input"
                 />
                 <input
                   type="text"
                   value={agent.url}
-                  onChange={(e) => updateAgent(agent.id, 'url', e.target.value)}
+                  onChange={(e) => {
+                    updateAgent(agent.id, 'url', e.target.value);
+                  }}
                   placeholder="http://..."
                   className="agent-edit-input url"
                 />
                 <button
                   className="agent-edit-delete-btn"
-                  onClick={() => removeAgent(agent.id)}
+                  onClick={() => {
+                    removeAgent(agent.id);
+                  }}
                   title="Remove agent"
                 >
                   ×
@@ -121,7 +152,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 min={1}
                 max={60}
                 value={refreshInterval / 1000}
-                onChange={(e) => setRefreshInterval(Number(e.target.value) * 1000)}
+                onChange={(e) => {
+                  setRefreshInterval(Number(e.target.value) * 1000);
+                }}
               />
               <span>{(refreshInterval / 1000).toFixed(0)}s</span>
             </div>
@@ -135,20 +168,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span className="threshold-label">{type.charAt(0).toUpperCase() + type.slice(1)}</span>
                 <div className="threshold-inputs">
                   <div className="threshold-input-group">
-                    <label>Warn</label>
+                    <label htmlFor={`warn-${type}`}>Warn</label>
                     <input
+                      id={`warn-${type}`}
                       type="number"
                       value={thresholds[type].warn}
-                      onChange={(e) => updateThreshold(type, 'warn', Number(e.target.value))}
+                      onChange={(e) => {
+                        updateThreshold(type, 'warn', Number(e.target.value));
+                      }}
                       className="threshold-input"
                     />
                   </div>
                   <div className="threshold-input-group">
-                    <label>Critical</label>
+                    <label htmlFor={`critical-${type}`}>Critical</label>
                     <input
+                      id={`critical-${type}`}
                       type="number"
                       value={thresholds[type].critical}
-                      onChange={(e) => updateThreshold(type, 'critical', Number(e.target.value))}
+                      onChange={(e) => {
+                        updateThreshold(type, 'critical', Number(e.target.value));
+                      }}
                       className="threshold-input"
                     />
                   </div>

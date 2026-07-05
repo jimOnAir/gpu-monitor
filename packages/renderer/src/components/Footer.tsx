@@ -10,8 +10,11 @@ export const Footer: React.FC<FooterProps> = ({
   lastUpdate,
 }) => {
   const formatTime = (ts: number): string => {
-    if (!ts) return '--:--:--';
+    if (!ts) {
+      return '--:--:--';
+    }
     const d = new Date(ts);
+
     return d.toLocaleTimeString();
   };
 

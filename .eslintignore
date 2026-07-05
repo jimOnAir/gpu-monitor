@@ -1,0 +1,10 @@
+node_modules/
+build/
+dist/
+coverage/
+*.min.js
+.env
+.env.local
+.env.*.local
+!.eslintrc.js
+!.eslintrc.json

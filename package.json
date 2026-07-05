@@ -6,7 +6,7 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">20"
   },
   "main": "packages/main/dist/electron-app/main.js",
   "scripts": {
@@ -23,12 +23,25 @@
     "clean": "rimraf node_modules packages/*/node_modules release"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/parser": "^8.62.1",
     "concurrently": "^8.2.0",
     "electron-builder": "^26.0.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-import-x": "^3.1.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-n": "^17.24.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-unicorn": "^56.0.0",
+    "globals": "^17.0.0",
     "jsdom": "^29.1.1",
     "rimraf": "^5.0.0",
     "typescript": "^5.3.0",
+    "typescript-eslint": "^8.62.1",
     "webpack-dev-server": "^5.2.5"
   },
   "build": {

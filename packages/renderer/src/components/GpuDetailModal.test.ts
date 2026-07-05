@@ -1,13 +1,13 @@
+import { EAgentStatus } from '@gpu-monitor/shared';
 import { describe, it, expect } from 'vitest';
+
 import { getPerfStateLabel } from './GpuDetailModal';
 import { getStatusLabel } from './GpuDetailModal';
-import { EAgentStatus } from '@gpu-monitor/shared';
 
 describe('getPerfStateLabel', () => {
   it('returns N/A for undefined', () => {
     expect(getPerfStateLabel(undefined)).toBe('N/A');
   });
-
 
   it('returns P0 (Max) for 0', () => {
     expect(getPerfStateLabel(0)).toBe('P0 (Max)');

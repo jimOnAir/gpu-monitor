@@ -1,10 +1,11 @@
-import { IAgent } from './IAgent';
 import { EAgentStatus } from '../enums/EAgentStatus';
 
+import type { IAgent } from './IAgent';
+
 export interface ITemperatureThresholds {
-  core: { warn: number; critical: number };
-  junction: { warn: number; critical: number };
-  vram: { warn: number; critical: number };
+  core: { warn: number, critical: number };
+  junction: { warn: number, critical: number };
+  vram: { warn: number, critical: number };
 }
 
 export interface ISettings {

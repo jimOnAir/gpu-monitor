@@ -1,4 +1,4 @@
-import { EAgentStatus } from '../enums/EAgentStatus';
+import type { EAgentStatus } from '../enums/EAgentStatus';
 
 export interface IAgent {
   id: string;

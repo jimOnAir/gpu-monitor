@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { formatValue, getMemoryStatus } from './GpuCard';
 
 describe('formatValue', () => {
@@ -41,6 +42,4 @@ describe('getMemoryStatus', () => {
   it('returns danger for exactly 0.95 ratio', () => {
     expect(getMemoryStatus(950, 1000)).toBe('danger');
   });
-
-
 });

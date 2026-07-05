@@ -25,7 +25,9 @@ const entries: LogEntry[] = [];
 function emit(level: LogLevel, component: string, agent: string | undefined, message: string, meta?: Record<string, unknown>): void {
   const entry: LogEntry = { ts: Date.now(), level, component, agent, message, meta };
   entries.unshift(entry);
-  if (entries.length > MAX_ENTRIES) entries.length = MAX_ENTRIES;
+  if (entries.length > MAX_ENTRIES) {
+    entries.length = MAX_ENTRIES;
+  }
 
   // Also write to console for browser devtools
   switch (level) {

@@ -1,28 +1,42 @@
+import type { ISettings } from '@gpu-monitor/shared';
+import { DEFAULT_SETTINGS } from '@gpu-monitor/shared';
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
-import isDev from 'electron-is-dev';
-import { ISettings, DEFAULT_SETTINGS } from '@gpu-monitor/shared';
-import * as path from 'path';
 import * as fs from 'fs';
+import * as path from 'path';
+
 import logger from './logger';
 
 /** Validate settings against ISettings shape before persisting. */
 function isValidSettings(data: unknown): data is ISettings {
-  if (!data || typeof data !== 'object') return false;
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
   const d = data as Record<string, unknown>;
-  if (!Array.isArray(d.agents)) return false;
-  if (typeof d.refreshInterval !== 'number' || d.refreshInterval <= 0) return false;
-  if (!d.thresholds || typeof d.thresholds !== 'object') return false;
+  if (!Array.isArray(d.agents)) {
+    return false;
+  }
+  if (typeof d.refreshInterval !== 'number' || d.refreshInterval <= 0) {
+    return false;
+  }
+  if (!d.thresholds || typeof d.thresholds !== 'object') {
+    return false;
+  }
   const t = d.thresholds as Record<string, unknown>;
   for (const key of ['core', 'junction', 'vram'] as const) {
-    if (!t[key] || typeof t[key] !== 'object') return false;
+    if (!t[key] || typeof t[key] !== 'object') {
+      return false;
+    }
     const entry = t[key] as Record<string, unknown>;
-    if (typeof entry.warn !== 'number' || typeof entry.critical !== 'number') return false;
+    if (typeof entry.warn !== 'number' || typeof entry.critical !== 'number') {
+      return false;
+    }
   }
+
   return true;
 }
 
-  // Set app name for proper userData path
-  app.setName('gpu-monitor');
+// Set app name for proper userData path
+app.setName('gpu-monitor');
 
 // Settings file path
 const SETTINGS_DIR = path.join(app.getPath('userData'), 'settings');
@@ -48,7 +62,9 @@ if (!app.requestSingleInstanceLock()) {
 app.on('second-instance', () => {
   logger.info('Second instance attempted — focusing existing window');
   if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
     mainWindow.show();
     mainWindow.focus();
   }
@@ -79,6 +95,7 @@ function loadIcon(name: string): Electron.NativeImage {
   } else {
     logger.info({ name, iconPath, isEmpty: img.isEmpty(), width: img.getSize().width, height: img.getSize().height }, 'Tray icon loaded');
   }
+
   return img;
 }
 
@@ -100,10 +117,12 @@ function loadBuildIcon(): Electron.NativeImage {
   const img = nativeImage.createFromPath(iconPath);
   if (img.isEmpty()) {
     logger.warn({ iconPath }, 'Build icon not found, using default tray icon');
+
     return nativeImage.createEmpty();
   }
 
   logger.info({ iconPath, width: img.getSize().width, height: img.getSize().height }, 'Build icon loaded');
+
   return img;
 }
 
@@ -113,20 +132,28 @@ function getTrayIcon(): Electron.NativeImage {
   if (buildIcon.isEmpty()) {
     return loadIcon('default');
   }
+
   // Resize to 24x24 for tray (Electron handles scaling quality)
   return buildIcon.resize({ width: 24, height: 24 });
 }
 
 /** Get the appropriate icon based on max temperature. */
 function getTempIcon(maxTemp: number, warn: number, critical: number): Electron.NativeImage {
-  if (maxTemp >= critical) return loadIcon('critical');
-  if (maxTemp >= warn) return loadIcon('warning');
+  if (maxTemp >= critical) {
+    return loadIcon('critical');
+  }
+  if (maxTemp >= warn) {
+    return loadIcon('warning');
+  }
+
   return loadIcon('normal');
 }
 
 /** Update tray icon only when temperature state changes. */
 function updateTrayIcon(maxTemp: number, warn: number, critical: number): void {
-  if (!tray) return;
+  if (!tray) {
+    return;
+  }
 
   let newState: 'normal' | 'warning' | 'critical';
   if (maxTemp >= critical) {
@@ -137,7 +164,9 @@ function updateTrayIcon(maxTemp: number, warn: number, critical: number): void {
     newState = 'normal';
   }
 
-  if (newState === lastTrayState) return;
+  if (newState === lastTrayState) {
+    return;
+  }
   lastTrayState = newState;
   tray.setImage(getTempIcon(maxTemp, warn, critical));
 }
@@ -147,7 +176,7 @@ export function loadSettings(): ISettings {
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
       const raw = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(raw) as unknown;
       if (isValidSettings(parsed)) {
         return parsed;
       }
@@ -156,6 +185,7 @@ export function loadSettings(): ISettings {
   } catch (err) {
     logger.error({ err: String(err) }, 'Failed to load settings');
   }
+
   return { ...DEFAULT_SETTINGS };
 }
 
@@ -163,13 +193,16 @@ export function loadSettings(): ISettings {
 export function saveSettings(settings: unknown): boolean {
   if (!isValidSettings(settings)) {
     logger.error('Refusing to save invalid settings', undefined, 'settings schema validation failed');
+
     return false;
   }
   try {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+
     return true;
   } catch (err) {
     logger.error({ err: String(err) }, 'Failed to save settings');
+
     return false;
   }
 }
@@ -254,6 +287,7 @@ function createMainWindow(): void {
     // Otherwise just hide the window to the system tray.
     if (willQuit) {
       mainWindow = null;
+
       return;
     }
     event.preventDefault();
@@ -273,13 +307,16 @@ ipcMain.on('window-close', () => {
 
 ipcMain.handle('get-settings', () => {
   logger.debug('IPC get-settings');
+
   return loadSettings();
 });
 
 ipcMain.handle('save-settings', (_event, settings: unknown) => {
-  const agents = (settings as { agents?: unknown[] })?.agents?.length ?? 0;
+  const s = settings as { agents?: unknown[] };
+  const agents = s.agents && Array.isArray(s.agents) ? s.agents.length : 0;
   logger.info({ agents }, 'IPC save-settings');
   saveSettings(settings);
+
   return true;
 });
 
@@ -288,8 +325,8 @@ ipcMain.on('refresh-agents', () => {
   mainWindow?.webContents.send('refresh-agents');
 });
 
-ipcMain.on('update-tray-temp', (_event, data: { maxTemp: number; warn: number; critical: number }) => {
-  logger.debug('IPC update-tray-temp', undefined, `maxTemp=${data.maxTemp}°C`, { maxTemp: data.maxTemp });
+ipcMain.on('update-tray-temp', (_event, data: { maxTemp: number, warn: number, critical: number }) => {
+  logger.debug('IPC update-tray-temp', undefined, `maxTemp=${String(data.maxTemp)}°C`, { maxTemp: data.maxTemp });
   updateTrayIcon(data.maxTemp, data.warn, data.critical);
 });
 

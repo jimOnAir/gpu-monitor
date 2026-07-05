@@ -1,24 +1,27 @@
+import type { ISettings } from '@gpu-monitor/shared';
+import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
 import React, { useState, useEffect, useCallback } from 'react';
-import { AgentService, AgentState } from './domains/agents/AgentService';
-import { DashboardService } from './domains/dashboard/DashboardService';
-import { GpuDetailModal } from './components/GpuDetailModal';
-import { GpuCard } from './components/GpuCard';
-import { Footer } from './components/Footer';
+
 import { DebugPanel } from './components/DebugPanel';
+import { Footer } from './components/Footer';
+import { GpuCard } from './components/GpuCard';
+import { GpuDetailModal } from './components/GpuDetailModal';
 import { SettingsModal } from './components/SettingsModal';
-import { ISettings, DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
+import type { AgentState } from './domains/agents/AgentService';
+import { AgentService } from './domains/agents/AgentService';
+import { DashboardService } from './domains/dashboard/DashboardService';
 import './styles/main.css';
 
 declare global {
   interface Window {
     electronAPI?: {
-      getSettings: () => Promise<ISettings | null>;
-      saveSettings: (settings: ISettings) => Promise<boolean>;
-      onRefreshAgents: (callback: () => void) => void;
-      onOpenSettings: (callback: () => void) => void;
-      onWindowClose: () => void;
-      updateTrayTemp: (maxTemp: number, warn: number, critical: number) => void;
-      updateTrayTooltip: (text: string) => void;
+      getSettings: () => Promise<ISettings | null>,
+      saveSettings: (settings: ISettings) => Promise<boolean>,
+      onRefreshAgents: (callback: () => void) => void,
+      onOpenSettings: (callback: () => void) => void,
+      onWindowClose: () => void,
+      updateTrayTemp: (maxTemp: number, warn: number, critical: number) => void,
+      updateTrayTooltip: (text: string) => void,
     };
   }
 }
@@ -37,14 +40,14 @@ export const App: React.FC = () => {
     statusChangedAt: new Map(),
   });
   const [selectedGpu, setSelectedGpu] = useState<{
-    agentId: string;
-    agentName: string;
-    gpu: import('@gpu-monitor/shared').IGpu;
-    index: number;
+    agentId: string,
+    agentName: string,
+    gpu: import('@gpu-monitor/shared').IGpu,
+    index: number,
   } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
-  const [error, setError] = useState<string | undefined>();
+  const [_error, setError] = useState<string | undefined>();
 
   const handleWindowClose = useCallback(() => {
     if (window.electronAPI?.onWindowClose) {
@@ -68,7 +71,7 @@ export const App: React.FC = () => {
         console.error('Failed to load settings:', err);
       }
     };
-    loadSettings();
+    void loadSettings();
   }, []);
 
   // Initialize agent service with settings
@@ -80,7 +83,7 @@ export const App: React.FC = () => {
 
       // Check for errors
       const offlineAgents = state.agents.filter(
-        (a) => a.status === EAgentStatus.Offline && a.lastError
+        (a) => a.status === EAgentStatus.Offline && a.lastError,
       );
       if (offlineAgents.length > 0) {
         setError(`${offlineAgents.length} agent(s) offline: ${offlineAgents[0].lastError}`);
@@ -109,7 +112,9 @@ export const App: React.FC = () => {
 
   // Update tray icon based on max temperature across all GPUs
   useEffect(() => {
-    if (!window.electronAPI) return;
+    if (!window.electronAPI) {
+      return;
+    }
 
     let maxTemp = 0;
     agentState.gpus.forEach((gpus) => {
@@ -129,7 +134,9 @@ export const App: React.FC = () => {
 
   // Update tray tooltip with full GPU status
   useEffect(() => {
-    if (!window.electronAPI || agentState.gpus.size === 0) return;
+    if (!window.electronAPI || agentState.gpus.size === 0) {
+      return;
+    }
 
     const parts: string[] = [];
     agentState.gpus.forEach((gpus) => {
@@ -153,7 +160,7 @@ export const App: React.FC = () => {
       }
       agentService.updateSettings(newSettings);
     },
-    []
+    [],
   );
 
   // Handle GPU card click
@@ -169,7 +176,7 @@ export const App: React.FC = () => {
   const gpusByAgent = dashboardService.getGpusByAgent(agentState);
   const unreachableAgents = dashboardService.getUnreachableAgents(agentState);
   const lastUpdate = dashboardService.getLastUpdateTime(agentState);
-  const gpuCount = dashboardService.getGpuCount(agentState);
+  const _gpuCount = dashboardService.getGpuCount(agentState);
 
   // Driver version (all GPUs on one machine share the same driver)
   const driverVersion = (() => {
@@ -178,6 +185,7 @@ export const App: React.FC = () => {
         return gpus[0].driverVersion;
       }
     }
+
     return undefined;
   })();
 
@@ -185,16 +193,21 @@ export const App: React.FC = () => {
     <div className="app">
       {/* Custom Title Bar */}
       <div className="title-bar">
-        <div className="title-bar-text">GPU Monitor</div>
+        {/* eslint-disable-next-line @stylistic/quotes -- emoji icons */}
+        <div className="title-bar-text">🔥 GPU Monitor</div>
         <div className="title-bar-controls">
-          <button className="control-btn" onClick={() => setShowDebug(!showDebug)} title="Debug">
-            {showDebug ? 'X' : 'K'}
+          <button className="control-btn" onClick={() => {
+            setShowDebug(!showDebug);
+          }} title="Debug">
+            {showDebug ? '✕' : '⌨'}
           </button>
-          <button className="control-btn" onClick={() => setShowSettings(true)} title="Settings">
-            S
+          <button className="control-btn" onClick={() => {
+            setShowSettings(true);
+          }} title="Settings">
+            ⚙
           </button>
           <button className="control-btn control-btn-close" onClick={handleWindowClose} title="Close">
-            X
+            ✕
           </button>
         </div>
       </div>
@@ -244,7 +257,9 @@ export const App: React.FC = () => {
       {/* Settings Modal */}
       <SettingsModal
         isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
+        onClose={() => {
+          setShowSettings(false);
+        }}
         settings={settings}
         onSave={handleSaveSettings}
       />
@@ -253,8 +268,11 @@ export const App: React.FC = () => {
       {selectedGpu && (() => {
         const currentGpus = agentState.gpus.get(selectedGpu.agentId);
         const currentGpu = currentGpus?.[selectedGpu.index];
-        if (!currentGpu) return null;
+        if (!currentGpu) {
+          return null;
+        }
         const agent = agentState.agents.find((a) => a.id === selectedGpu.agentId);
+
         return (
           <GpuDetailModal
             gpu={currentGpu}
@@ -271,7 +289,9 @@ export const App: React.FC = () => {
       <DebugPanel
         agentState={agentState}
         visible={showDebug}
-        onToggle={() => setShowDebug(false)}
+        onToggle={() => {
+          setShowDebug(false);
+        }}
       />
     </div>
   );
@@ -279,7 +299,7 @@ export const App: React.FC = () => {
 
 interface AgentSectionProps {
   agentId: string;
-  gpuData: Array<{ gpu: import('@gpu-monitor/shared').IGpu; agentName: string }>;
+  gpuData: Array<{ gpu: import('@gpu-monitor/shared').IGpu, agentName: string }>;
   agent: import('@gpu-monitor/shared').IAgent | undefined;
   onGpuClick: (agentId: string, agentName: string, gpu: import('@gpu-monitor/shared').IGpu, index: number) => void;
 }
@@ -300,7 +320,9 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, ag
           gpu={gpu}
           index={gpu.index}
           agentName={gpuData[0].agentName}
-          onClick={() => onGpuClick(agentId, gpuData[0].agentName, gpu, gpu.index)}
+          onClick={() => {
+            onGpuClick(agentId, gpuData[0].agentName, gpu, gpu.index);
+          }}
         />
       ))}
     </div>
@@ -342,5 +364,4 @@ function getAgentStatusBadge(status?: EAgentStatus): string {
       return 'Unknown';
   }
 }
-
 

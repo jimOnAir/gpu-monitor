@@ -1,4 +1,5 @@
-import { IGpu } from '@gpu-monitor/shared';
+import type { IGpu } from '@gpu-monitor/shared';
+
 import { logger } from './logger';
 
 const FETCH_TIMEOUT_MS = 5000;
@@ -16,6 +17,7 @@ function validateAgentUrl(raw: string): string {
     if (!ALLOWED_PROTOCOLS.has(url.protocol)) {
       throw new Error(`Disallowed protocol: ${url.protocol}`);
     }
+
     // Strip trailing slash so path joining works: base + '/gpu' => '/gpu' not '//gpu'
     return url.toString().replace(/\/$/, '');
   } catch {
@@ -34,7 +36,9 @@ export class AgentRepository {
    */
   async fetchGpus(agentUrl: string): Promise<IGpu[] | null> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, FETCH_TIMEOUT_MS);
 
     try {
       const validatedUrl = validateAgentUrl(agentUrl);
@@ -48,23 +52,28 @@ export class AgentRepository {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const data = await response.json();
+      const raw = await response.json() as Record<string, unknown> | IGpu[];
 
       // C agent wraps GPUs in {"timestamp": ..., "gpus": [...]}
       // Tolerate both wrapped and raw array formats
-      if (Array.isArray(data)) {
-        logger.info('AgentRepository', undefined, `Fetched ${data.length} GPU(s) from ${agentUrl}`, { gpuCount: data.length });
-        return data as IGpu[];
+      if (Array.isArray(raw)) {
+        logger.info('AgentRepository', undefined, `Fetched ${raw.length} GPU(s) from ${agentUrl}`, { gpuCount: raw.length });
+
+        return raw;
       }
-      if (data && typeof data === 'object' && Array.isArray((data as any).gpus)) {
-        logger.info('AgentRepository', undefined, `Fetched ${(data as any).gpus.length} GPU(s) from ${agentUrl}`, { gpuCount: (data as any).gpus.length });
-        return (data as any).gpus as IGpu[];
+      if (typeof raw === 'object' && raw !== null && Array.isArray(raw.gpus)) {
+        const gpus = raw.gpus as IGpu[];
+        logger.info('AgentRepository', undefined, `Fetched ${gpus.length} GPU(s) from ${agentUrl}`, { gpuCount: gpus.length });
+
+        return gpus;
       }
       throw new Error('Invalid response: expected array or {gpus: [...]}');
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         logger.warn('AgentRepository', undefined, `Request timed out: ${agentUrl}`);
-        throw new Error('Request timed out');
+        const timeoutErr = new Error('Request timed out');
+        (timeoutErr as Error & { cause?: unknown }).cause = err;
+        throw timeoutErr;
       }
       logger.error('AgentRepository', undefined, `Fetch failed: ${agentUrl}: ${(err as Error).message}`);
       throw err;
@@ -82,7 +91,9 @@ export class AgentRepository {
       const validatedUrl = validateAgentUrl(agentUrl);
       logger.debug('AgentRepository', undefined, `Health check: ${validatedUrl}`);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 2000);
 
       const response = await fetch(`${validatedUrl}/health`, {
         signal: controller.signal,
@@ -93,9 +104,11 @@ export class AgentRepository {
       if (!ok) {
         logger.warn('AgentRepository', undefined, `Health check failed: ${agentUrl} (HTTP ${response.status})`);
       }
+
       return ok;
     } catch (err) {
       logger.error('AgentRepository', undefined, `Health check error: ${agentUrl}: ${(err as Error).message}`);
+
       return false;
     }
   }
