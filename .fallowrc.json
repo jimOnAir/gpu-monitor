@@ -1,0 +1,5 @@
+{
+  "ignorePatterns": [
+    "packages/main/src/preload.ts"
+  ]
+}

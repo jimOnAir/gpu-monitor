@@ -107,27 +107,6 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
     if (e.target === e.currentTarget) onClose();
   };
 
-  const getPerfStateLabel = (pstate: number | undefined): string => {
-    if (pstate === undefined || pstate === null) return 'N/A';
-    if (pstate === 0) return 'P0 (Max)';
-    if (pstate <= 3) return `P${pstate} (High)`;
-    if (pstate <= 6) return `P${pstate} (Mid)`;
-    return `P${pstate} (Low)`;
-  };
-
-  const getStatusLabel = (status: EAgentStatus): string => {
-    switch (status) {
-      case EAgentStatus.Online:
-        return 'Online';
-      case EAgentStatus.Offline:
-        return 'Offline';
-      case EAgentStatus.Stale:
-        return 'Stale';
-      default:
-        return 'Unknown';
-    }
-  };
-
   return (
     <div className="modal-backdrop" onClick={handleBackdropClick} role="dialog" aria-label={`GPU ${gpuIndex} detail`}>
       <div className="modal-container modal-container-detail">
@@ -304,6 +283,27 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
     </div>
   );
 };
+
+export function getPerfStateLabel(pstate: number | undefined): string {
+  if (pstate === undefined) return 'N/A';
+  if (pstate === 0) return 'P0 (Max)';
+  if (pstate <= 3) return `P${pstate} (High)`;
+  if (pstate <= 6) return `P${pstate} (Mid)`;
+  return `P${pstate} (Low)`;
+}
+
+export function getStatusLabel(status: EAgentStatus): string {
+  switch (status) {
+    case EAgentStatus.Online:
+      return 'Online';
+    case EAgentStatus.Offline:
+      return 'Offline';
+    case EAgentStatus.Stale:
+      return 'Stale';
+    default:
+      return 'Unknown';
+  }
+}
 
 function getStatusColor(status: 'normal' | 'warning' | 'danger'): string {
   switch (status) {

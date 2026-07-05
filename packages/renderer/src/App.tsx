@@ -185,16 +185,16 @@ export const App: React.FC = () => {
     <div className="app">
       {/* Custom Title Bar */}
       <div className="title-bar">
-        <div className="title-bar-text">🔥 GPU Monitor</div>
+        <div className="title-bar-text">GPU Monitor</div>
         <div className="title-bar-controls">
           <button className="control-btn" onClick={() => setShowDebug(!showDebug)} title="Debug">
-            {showDebug ? '✕' : '⌨'}
+            {showDebug ? 'X' : 'K'}
           </button>
           <button className="control-btn" onClick={() => setShowSettings(true)} title="Settings">
-            ⚙
+            S
           </button>
           <button className="control-btn control-btn-close" onClick={handleWindowClose} title="Close">
-            ✕
+            X
           </button>
         </div>
       </div>
@@ -212,49 +212,23 @@ export const App: React.FC = () => {
           ) : (
             <>
               {/* Reachable agents */}
-              {Array.from(gpusByAgent.entries()).map(([agentId, gpuData]) => {
-                const agent = agentState.agents.find((a) => a.id === agentId);
-                return (
-                  <div key={agentId} className="agent-section">
-                    <div className="agent-section-header">
-                      <h3>{gpuData[0].agentName}</h3>
-                      <span className="agent-endpoint">{agent?.url || ''}</span>
-                      <span className={`agent-status-badge ${agent?.status || ''}`}>
-                        {getAgentStatusBadge(agent?.status)}
-                      </span>
-                    </div>
-                    <div className="gpu-grid">
-                      {gpuData.map(({ gpu }, idx) => (
-                        <GpuCard
-                          key={`${agentId}-gpu-${gpu.index}`}
-                          gpu={gpu}
-                          index={gpu.index}
-                          agentName={gpuData[0].agentName}
-                          onClick={() => handleGpuClick(agentId, gpuData[0].agentName, gpu, gpu.index)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+              {Array.from(gpusByAgent.entries()).map(([agentId, gpuData]) => (
+                <AgentSection
+                  key={agentId}
+                  agentId={agentId}
+                  gpuData={gpuData}
+                  agent={agentState.agents.find((a) => a.id === agentId)}
+                  onGpuClick={handleGpuClick}
+                />
+              ))}
 
               {/* Unreachable agents */}
               {unreachableAgents.map(({ agent }) => (
-                <div key={agent.id} className="agent-section agent-section-unreachable">
-                  <div className="agent-section-header">
-                    <h3>{agent.name}</h3>
-                    <span className="agent-endpoint">{agent.url}</span>
-                    <span className={`agent-status-badge ${agent.status}`}>
-                      {getAgentStatusBadge(agent.status)}
-                    </span>
-                  </div>
-                  {agent.lastError && (
-                    <div className="unreachable-error">
-                      <span className="unreachable-error-icon">!</span>
-                      {agent.lastError}
-                    </div>
-                  )}
-                </div>
+                <UnreachableAgent
+                  key={agent.id}
+                  agent={agent}
+                  onGpuClick={handleGpuClick}
+                />
               ))}
             </>
           )}
@@ -303,6 +277,59 @@ export const App: React.FC = () => {
   );
 };
 
+interface AgentSectionProps {
+  agentId: string;
+  gpuData: Array<{ gpu: import('@gpu-monitor/shared').IGpu; agentName: string }>;
+  agent: import('@gpu-monitor/shared').IAgent | undefined;
+  onGpuClick: (agentId: string, agentName: string, gpu: import('@gpu-monitor/shared').IGpu, index: number) => void;
+}
+
+export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, agent, onGpuClick }) => (
+  <div className="agent-section">
+    <div className="agent-section-header">
+      <h3>{gpuData[0].agentName}</h3>
+      <span className="agent-endpoint">{agent?.url || ''}</span>
+      <span className={`agent-status-badge ${agent?.status || ''}`}>
+        {getAgentStatusBadge(agent?.status)}
+      </span>
+    </div>
+    <div className="gpu-grid">
+      {gpuData.map(({ gpu }) => (
+        <GpuCard
+          key={`${agentId}-gpu-${gpu.index}`}
+          gpu={gpu}
+          index={gpu.index}
+          agentName={gpuData[0].agentName}
+          onClick={() => onGpuClick(agentId, gpuData[0].agentName, gpu, gpu.index)}
+        />
+      ))}
+    </div>
+  </div>
+);
+
+interface UnreachableAgentProps {
+  agent: import('@gpu-monitor/shared').IAgent;
+  onGpuClick: (agentId: string, agentName: string, gpu: import('@gpu-monitor/shared').IGpu, index: number) => void;
+}
+
+export const UnreachableAgent: React.FC<UnreachableAgentProps> = ({ agent }) => (
+  <div className="agent-section agent-section-unreachable">
+    <div className="agent-section-header">
+      <h3>{agent.name}</h3>
+      <span className="agent-endpoint">{agent.url}</span>
+      <span className={`agent-status-badge ${agent.status}`}>
+        {getAgentStatusBadge(agent.status)}
+      </span>
+    </div>
+    {agent.lastError && (
+      <div className="unreachable-error">
+        <span className="unreachable-error-icon">!</span>
+        {agent.lastError}
+      </div>
+    )}
+  </div>
+);
+
 function getAgentStatusBadge(status?: EAgentStatus): string {
   switch (status) {
     case EAgentStatus.Online:
@@ -316,4 +343,4 @@ function getAgentStatusBadge(status?: EAgentStatus): string {
   }
 }
 
-export default App;
+

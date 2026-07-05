@@ -1,3 +1,5 @@
+/* fallow: This file is a separate esbuild entry point (see scripts/build-esbuild.js:65-69),
+   not dead code. Ignored in fallow analysis. */
 import { contextBridge, ipcRenderer } from 'electron';
 
 /**

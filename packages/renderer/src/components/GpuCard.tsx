@@ -109,7 +109,7 @@ const GpuRow: React.FC<GpuRowProps> = ({ label, value, max, unit, status, showDe
 
 const GB = 1024 * 1024 * 1024;
 
-function formatValue(value: number, max: number, unit: string, showDetail?: boolean): string {
+export function formatValue(value: number, max: number, unit: string, showDetail?: boolean): string {
   if (showDetail) {
     return `${value.toFixed(0)}/${max.toFixed(0)}${unit}`;
   }
@@ -122,7 +122,7 @@ function formatValue(value: number, max: number, unit: string, showDetail?: bool
   return `${Math.round(value)}${unit}`;
 }
 
-function getMemoryStatus(used: number, total: number): 'normal' | 'warning' | 'danger' {
+export function getMemoryStatus(used: number, total: number): 'normal' | 'warning' | 'danger' {
   const ratio = used / total;
   if (ratio > 0.9) return 'danger';
   if (ratio > 0.7) return 'warning';
