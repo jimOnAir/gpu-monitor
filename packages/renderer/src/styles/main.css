@@ -74,12 +74,70 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Settings window — same background as main window, no extra padding */
+body.settings-body {
+  margin: 0;
+  padding: 0;
+}
+
 /* App Container */
 .app {
   display: flex;
   flex-direction: column;
   height: 100vh;
   background-color: var(--bg-primary);
+}
+
+/* Settings Window - separate window, background set by BrowserWindow */
+.settings-window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Settings Title Bar */
+.settings-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 12px;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.settings-title {
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.settings-close-btn {
+  -webkit-app-region: no-drag;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: default;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.settings-close-btn:hover {
+  background-color: var(--status-danger);
+  color: white;
+}
+
+/* Settings Content */
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-lg);
 }
 
 /* Title Bar */
@@ -93,6 +151,7 @@ body {
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
   user-select: none;
+  -webkit-user-select: none;
 }
 
 .title-bar-text {
@@ -112,7 +171,7 @@ body {
   border: none;
   color: var(--text-muted);
   font-size: 16px;
-  cursor: pointer;
+  cursor: default;
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-sm);
   transition: all 0.2s ease;
@@ -565,15 +624,13 @@ body {
   animation: fadeIn 0.2s ease;
 }
 
-.modal-container {
+.settings-modal-container {
   background-color: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  width: 90%;
-  max-width: 500px;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 8px 32px var(--shadow);
-  animation: slideUp 0.2s ease;
+  border-radius: var(--radius-md);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-header {
@@ -595,7 +652,7 @@ body {
   border: none;
   color: var(--text-muted);
   font-size: 24px;
-  cursor: pointer;
+  cursor: default;
   padding: var(--spacing-xs);
   border-radius: var(--radius-sm);
   transition: all 0.2s ease;
@@ -607,6 +664,8 @@ body {
 }
 
 .modal-body {
+  flex: 1;
+  overflow-y: auto;
   padding: var(--spacing-lg);
 }
 
@@ -654,7 +713,7 @@ body {
   border: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 18px;
-  cursor: pointer;
+  cursor: default;
   padding: 0 var(--spacing-sm);
   border-radius: var(--radius-sm);
   transition: all 0.2s ease;
@@ -675,7 +734,7 @@ body {
   color: var(--text-secondary);
   font-family: var(--font-family);
   font-size: var(--font-size-body);
-  cursor: pointer;
+  cursor: default;
   transition: all 0.2s ease;
 }
 
@@ -839,7 +898,7 @@ body {
   font-family: var(--font-family);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
-  cursor: pointer;
+  cursor: default;
   transition: all 0.2s ease;
 }
 
@@ -931,6 +990,59 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+/* Loading and Error States */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+}
+
+.error {
+  padding: 20px;
+  color: var(--status-danger);
+  font-family: var(--font-family);
+}
+
+.error h2 {
+  margin-bottom: 10px;
+}
+
+/* Toast Notifications */
+.toast {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px var(--shadow);
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
+}
+
+.toast-success {
+  background-color: var(--status-normal);
+  color: white;
+}
+
+.toast-error {
+  background-color: var(--status-danger);
+  color: white;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Debug Panel */
@@ -1069,6 +1181,15 @@ body {
 
 .debug-agent-error .debug-value {
   color: var(--status-danger);
+}
+
+/* Window Focus/Blur — dim when unfocused for native feel */
+.app {
+  transition: opacity 0.2s ease;
+}
+
+.app.unfocused {
+  opacity: 0.92;
 }
 
 /* Debug Log */

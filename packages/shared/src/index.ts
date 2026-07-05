@@ -11,5 +11,5 @@ export type {
   GpuDataPayload,
   FetchResult,
 } from './types/IElectronAPI';
-export type { IpcInvokeMap, IpcEventMap } from './types/IpcChannels';
+export type { IpcInvokeMap, IpcEventMap, IpcResult, UpdateAvailableInfo, UpdateDownloadedInfo } from './types/IpcChannels';
 export { IpcEventChannels, IpcInvokeChannels } from './types/IpcChannels';

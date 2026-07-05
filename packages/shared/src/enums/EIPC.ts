@@ -11,5 +11,16 @@ export enum EIPC {
 
   // --- Renderer-facing event channels (main → renderer push) ---
   GPU_DATA_UPDATE = 'GPU_DATA_UPDATE',
-  OPEN_SETTINGS = 'OPEN_SETTINGS',
+  OPEN_PREFERENCES = 'OPEN_PREFERENCES',
+
+  // --- Auto-update events ---
+  UPDATE_AVAILABLE = 'UPDATE_AVAILABLE',
+  UPDATE_DOWNLOADED = 'UPDATE_DOWNLOADED',
+
+  // --- Window focus/blur ---
+  WINDOW_FOCUS = 'WINDOW_FOCUS',
+  WINDOW_BLUR = 'WINDOW_BLUR',
+
+  // --- Window close ---
+  CLOSE_PREFERENCES = 'CLOSE_PREFERENCES',
 }

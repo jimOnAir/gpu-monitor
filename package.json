@@ -20,10 +20,13 @@
     "lint": "npm run lint -w @gpu-monitor/main && npm run lint -w @gpu-monitor/renderer && npm run lint -w @gpu-monitor/shared",
     "package": "npm run build && electron-builder --linux AppImage",
     "package:linux": "npm run build && electron-builder --linux AppImage",
-    "clean": "rimraf node_modules packages/*/node_modules release"
+    "clean": "rimraf node_modules packages/*/node_modules release",
+    "postinstall": "electron-builder install-app-deps"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.61.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^20.11.0",
     "@typescript-eslint/eslint-plugin": "^8.62.1",
@@ -42,6 +45,9 @@
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.62.1",
     "webpack-dev-server": "^5.2.5"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   },
   "build": {
     "appId": "com.gpu-monitor.app",
@@ -62,7 +68,31 @@
       "target": "AppImage",
       "category": "Utility",
       "icon": "build/icons/icon.png"
-    }
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.utilities",
+      "icon": "build/icons/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "GPU Monitor uses the system for performance monitoring",
+        "NSCameraUsageDescription": "GPU Monitor uses the system for performance monitoring"
+      }
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icons/icon.ico"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://your-update-server.com/updates"
+      }
+    ],
+    "afterSign": "scripts/notarize.js"
   },
   "workspaces": [
     "packages/*"

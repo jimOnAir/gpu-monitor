@@ -34,7 +34,7 @@ export type IElectronInvokeApi = {
  */
 export type IElectronEventApi = {
   [K in keyof IpcEventMap]: (
-    callback: (...args: IpcEventMap[K]['args']) => void
+    callback: (...args: IpcEventMap[K]['args']) => void,
   ) => () => void;
 };
 

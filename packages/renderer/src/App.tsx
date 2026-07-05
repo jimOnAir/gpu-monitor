@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, EAgentStatus, EIPC } from '@gpu-monitor/shared';
+import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
 import type { ISettings } from '@gpu-monitor/shared';
 import type { GpuDataPayload } from '@gpu-monitor/shared';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -7,10 +7,10 @@ import { DebugPanel } from './components/DebugPanel';
 import { Footer } from './components/Footer';
 import { GpuCard } from './components/GpuCard';
 import { GpuDetailModal } from './components/GpuDetailModal';
-import { SettingsModal } from './components/SettingsModal';
 import { DashboardService } from './domains/dashboard/DashboardService';
-import './styles/main.css';
 import type { AgentState } from './types/AgentState';
+import { useWindowFocus } from './utils/useWindowFocus';
+import './styles/main.css';
 
 // ---------- Services ----------
 
@@ -36,6 +36,7 @@ function buildAgentState(payload: GpuDataPayload): AgentState {
 // ---------- App ----------
 
 export const App: React.FC = () => {
+  const isFocused = useWindowFocus();
   const [settings, setSettings] = useState<ISettings>(DEFAULT_SETTINGS);
   const [agentState, setAgentState] = useState<AgentState>({
     agents: [],
@@ -51,7 +52,6 @@ export const App: React.FC = () => {
     gpu: import('@gpu-monitor/shared').IGpu,
     index: number,
   } | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
 
   // Load settings from Electron API on mount
@@ -59,9 +59,9 @@ export const App: React.FC = () => {
     const loadSettings = async () => {
       try {
         if (window.electronAPI) {
-          const saved = await window.electronAPI.getSettings();
-          if (saved) {
-            setSettings(saved);
+          const result = await window.electronAPI.getSettings();
+          if (result.success && result.data) {
+            setSettings(result.data);
           }
         }
       } catch (err) {
@@ -77,34 +77,12 @@ export const App: React.FC = () => {
       const cleanup = window.electronAPI.onGpuDataUpdate((payload) => {
         setAgentState(buildAgentState(payload));
       });
+
       return cleanup;
     }
   }, []);
 
-  // Listen for tray menu open settings
-  useEffect(() => {
-    if (window.electronAPI?.onOpenSettings) {
-      const cleanup = window.electronAPI.onOpenSettings(() => {
-        setShowSettings(true);
-      });
-      return cleanup;
-    }
-  }, []);
-
-  // Save settings when they change
-  const handleSaveSettings = useCallback(
-    async (newSettings: ISettings) => {
-      setSettings(newSettings);
-      if (window.electronAPI) {
-        try {
-          await window.electronAPI.saveSettings(newSettings);
-        } catch (err) {
-          console.error('Failed to save settings:', err);
-        }
-      }
-    },
-    [],
-  );
+  // Settings now opens in a separate window — no tray menu listener needed
 
   // Handle GPU card click
   const handleGpuClick = useCallback((agentId: string, agentName: string, gpu: import('@gpu-monitor/shared').IGpu, index: number) => {
@@ -133,7 +111,7 @@ export const App: React.FC = () => {
   })();
 
   return (
-    <div className="app">
+    <div className={`app${!isFocused ? ' unfocused' : ''}`}>
       {/* Custom Title Bar */}
       <div className="title-bar">
         { }
@@ -145,12 +123,12 @@ export const App: React.FC = () => {
             {showDebug ? '✕' : '⌨'}
           </button>
           <button className="control-btn" onClick={() => {
-            setShowSettings(true);
+            void window.electronAPI?.openPreferences();
           }} title="Settings">
             ⚙
           </button>
           <button className="control-btn control-btn-close" onClick={() => {
-            window.electronAPI?.onWindowClose();
+            void window.electronAPI?.onWindowClose();
           }} title="Close">
             ✕
           </button>
@@ -199,15 +177,7 @@ export const App: React.FC = () => {
         lastUpdate={lastUpdate}
       />
 
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => {
-          setShowSettings(false);
-        }}
-        settings={settings}
-        onSave={handleSaveSettings}
-      />
+      {/* Settings now opens in a separate window */}
 
       {/* GPU Detail Modal */}
       {selectedGpu && (() => {
