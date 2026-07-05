@@ -1,5 +1,5 @@
-import type { ISettings } from '@gpu-monitor/shared';
 import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
+import type { ISettings } from '@gpu-monitor/shared';
 import type { GpuDataPayload } from '@gpu-monitor/shared';
 import React, { useState, useEffect, useCallback } from 'react';
 
@@ -18,10 +18,11 @@ const dashboardService = new DashboardService();
 
 /** Rebuild AgentState from IPC payload. */
 function buildAgentState(payload: GpuDataPayload): AgentState {
-  const gpus = new Map<string, import('@gpu-monitor/shared').IGpu[]>();
+  const gpus = new Map<string, Array<import('@gpu-monitor/shared').IGpu>>();
   for (const { agentId, gpus: gpuList } of payload.gpus) {
     gpus.set(agentId, gpuList);
   }
+
   return {
     agents: payload.agents,
     gpus,
@@ -74,14 +75,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (window.electronAPI?.onGpuDataUpdate) {
       window.electronAPI.onGpuDataUpdate((payload) => {
-        console.log('GPU data update received:', {
-          agentCount: payload.agents.length,
-          agents: payload.agents.map((a) => ({ id: a.id, status: a.status?.toString() ?? 'unknown' as string })),
-          gpuCount: payload.gpus.reduce((sum: number, g: { gpus: unknown[] }) => sum + g.gpus.length, 0),
-        });
         setAgentState(buildAgentState(payload));
       });
     }
+
     return () => { /* cleanup handled by main */ };
   }, []);
 
@@ -135,7 +132,7 @@ export const App: React.FC = () => {
     <div className="app">
       {/* Custom Title Bar */}
       <div className="title-bar">
-        {/* eslint-disable-next-line @stylistic/quotes -- emoji icons */}
+        { }
         <div className="title-bar-text">🔥 GPU Monitor</div>
         <div className="title-bar-controls">
           <button className="control-btn" onClick={() => {
@@ -149,11 +146,7 @@ export const App: React.FC = () => {
             ⚙
           </button>
           <button className="control-btn control-btn-close" onClick={() => {
-            if (window.electronAPI?.onWindowClose) {
-              window.electronAPI.onWindowClose();
-            } else {
-              window.close();
-            }
+            window.electronAPI?.onWindowClose();
           }} title="Close">
             ✕
           </button>

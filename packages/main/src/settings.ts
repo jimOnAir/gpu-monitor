@@ -1,6 +1,5 @@
-import { z } from 'zod';
-
 import { EAgentStatus } from '@gpu-monitor/shared';
+import { z } from 'zod';
 
 const tempThresholdSchema = z.object({
   warn: z.number(),

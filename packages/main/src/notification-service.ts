@@ -1,10 +1,10 @@
-import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
-import type { IAgent, IGpu, INotificationCooldowns, ITemperatureThresholds } from '@gpu-monitor/shared';
+import { EAgentStatus } from '@gpu-monitor/shared';
+import type { IAgent, IGpu, INotificationCooldowns, ITemperatureThresholds, DEFAULT_SETTINGS } from '@gpu-monitor/shared';
 import { Notification } from 'electron';
 import type { z } from 'zod';
 
 import logger from './logger';
-import { settingsSchema } from './settings';
+import type { settingsSchema } from './settings';
 
 export type Settings = z.infer<typeof settingsSchema>;
 

@@ -1,15 +1,16 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-
 import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
 import type { IAgent, IGpu, INotificationCooldowns } from '@gpu-monitor/shared';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { AgentData, NotificationService } from './notification-service';
+import type { AgentData } from './notification-service';
+import { NotificationService } from './notification-service';
 
 // Mock Electron — only Notification is needed; everything else is no-op stubs
-const mockNotifications: Array<{ title: string; body: string; icon: string; silent: boolean }> = [];
+const mockNotifications: Array<{ title: string, body: string, icon: string, silent: boolean }> = [];
 vi.mock('electron', () => ({
   Notification: vi.fn().mockImplementation((props: Record<string, unknown>) => {
     mockNotifications.push(props as unknown as typeof mockNotifications[0]);
+
     return { show: vi.fn() };
   }),
   app: {
@@ -35,11 +36,11 @@ vi.mock('electron', () => ({
   },
 }));
 
-function buildAgent(id: string = 'test', status: EAgentStatus = EAgentStatus.Online): IAgent {
+function buildAgent(id = 'test', status: EAgentStatus = EAgentStatus.Online): IAgent {
   return { id, name: id, url: 'http://localhost:9091', status };
 }
 
-function buildGpu(index: number = 0, overrides: Partial<IGpu> = {}): IGpu {
+function buildGpu(index = 0, overrides: Partial<IGpu> = {}): IGpu {
   return {
     index,
     name: 'Test GPU',
@@ -58,7 +59,7 @@ function buildGpu(index: number = 0, overrides: Partial<IGpu> = {}): IGpu {
   };
 }
 
-function buildData(agents: IAgent[] = [buildAgent()], gpus: Map<string, IGpu[]> = new Map()): AgentData {
+function buildData(agents: IAgent[] = [buildAgent()], gpus = new Map<string, IGpu[]>()): AgentData {
   return {
     agents,
     gpus,
@@ -81,7 +82,7 @@ describe('NotificationService', () => {
   beforeEach(() => {
     resetMock();
     service = new NotificationService();
-    settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+    settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as typeof DEFAULT_SETTINGS;
   });
 
   it('does nothing when notifications are disabled', () => {

@@ -1,8 +1,9 @@
 import type { IGpu } from '@gpu-monitor/shared';
 import React from 'react';
 
-import { GpuBar } from './GpuBar';
 import { getGpuUtilizationStatus, getMemoryStatus, getPowerStatus, GB } from '../utils/constants';
+
+import { GpuBar } from './GpuBar';
 
 interface GpuCardProps {
   gpu: IGpu;

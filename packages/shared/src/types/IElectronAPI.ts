@@ -1,6 +1,6 @@
 import type { IAgent } from './IAgent';
-import type { ISettings } from './ISettings';
 import type { IGpu } from './IGpu';
+import type { ISettings } from './ISettings';
 
 /**
  * Type-safe IPC payload between the Electron main process and renderer.
@@ -11,7 +11,7 @@ export type FetchResult = 'pending' | 'ok' | 'fetch-failed' | 'health-failed' | 
 
 export interface GpuDataPayload {
   agents: IAgent[];
-  gpus: Array<{ agentId: string; gpus: IGpu[] }>;
+  gpus: Array<{ agentId: string, gpus: IGpu[] }>;
   lastUpdate: Array<[string, number]>;
   lastFetchTimestamp: Array<[string, number]>;
   statusChangedAt: Array<[string, number]>;

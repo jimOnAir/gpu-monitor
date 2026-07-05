@@ -2,8 +2,9 @@ import type { IGpu } from '@gpu-monitor/shared';
 import { EAgentStatus } from '@gpu-monitor/shared';
 import React from 'react';
 
-import { GpuBar } from './GpuBar';
 import { GB, getGpuUtilizationStatus, getMemoryStatus, getPowerStatus } from '../utils/constants';
+
+import { GpuBar } from './GpuBar';
 
 interface GpuDetailModalProps {
   gpu: IGpu;

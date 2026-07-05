@@ -41,7 +41,7 @@ export const gpuResponseSchema = z.object({
 });
 
 /** Validate GPU response from a remote agent. Returns parsed data or null on failure. */
-export function validateGpuResponse(data: unknown): { gpus: z.infer<typeof gpuSchema>[]; timestamp?: number } | null {
+export function validateGpuResponse(data: unknown): { gpus: Array<z.infer<typeof gpuSchema>>, timestamp?: number } | null {
   const result = gpuResponseSchema.safeParse(data);
   if (!result.success) {
     return null;

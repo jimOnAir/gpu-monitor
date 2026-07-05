@@ -221,8 +221,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <div className="cooldowns-grid">
               <div className="cooldown-row">
-                <label>Temperature Critical</label>
+                <label htmlFor="cooldown-tempCritical">Temperature Critical</label>
                 <input
+                  id="cooldown-tempCritical"
                   type="number"
                   min={1}
                   max={600}
@@ -235,8 +236,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>s</span>
               </div>
               <div className="cooldown-row">
-                <label>Temperature Warning</label>
+                <label htmlFor="cooldown-tempWarn">Temperature Warning</label>
                 <input
+                  id="cooldown-tempWarn"
                   type="number"
                   min={1}
                   max={600}
@@ -249,8 +251,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>s</span>
               </div>
               <div className="cooldown-row">
-                <label>Temperature Recovered</label>
+                <label htmlFor="cooldown-tempRecover">Temperature Recovered</label>
                 <input
+                  id="cooldown-tempRecover"
                   type="number"
                   min={1}
                   max={600}
@@ -263,8 +266,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>s</span>
               </div>
               <div className="cooldown-row">
-                <label>Agent Offline</label>
+                <label htmlFor="cooldown-agentOffline">Agent Offline</label>
                 <input
+                  id="cooldown-agentOffline"
                   type="number"
                   min={1}
                   max={600}
@@ -277,8 +281,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>s</span>
               </div>
               <div className="cooldown-row">
-                <label>Agent Online</label>
+                <label htmlFor="cooldown-agentOnline">Agent Online</label>
                 <input
+                  id="cooldown-agentOnline"
                   type="number"
                   min={1}
                   max={600}
@@ -291,8 +296,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>s</span>
               </div>
               <div className="cooldown-row">
-                <label>All GPUs Recovered</label>
+                <label htmlFor="cooldown-allRecovered">All GPUs Recovered</label>
                 <input
+                  id="cooldown-allRecovered"
                   type="number"
                   min={1}
                   max={600}

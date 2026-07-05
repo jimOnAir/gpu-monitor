@@ -1,16 +1,14 @@
 import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
-import type { IAgent } from '@gpu-monitor/shared';
-import type { IGpu, INotificationCooldowns, ITemperatureThresholds } from '@gpu-monitor/shared';
+import type { IAgent, IGpu } from '@gpu-monitor/shared';
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
-import type { z } from 'zod';
 
-import logger from './logger';
-import { settingsSchema } from './settings';
-import { NotificationService, type AgentData, type FetchResult, type Settings } from './notification-service';
 import { validateGpuResponse } from './gpu-validation';
+import logger from './logger';
+import { NotificationService, type AgentData, type Settings } from './notification-service';
+import { settingsSchema } from './settings';
 
 /** Validate and parse settings. Returns parsed object or null on failure. */
 function parseSettings(data: unknown): Settings | null {
@@ -108,7 +106,7 @@ interface AgentFetchResult {
 }
 
 type ClassifiedResult
-  = | { status: 'ok', gpus: { gpus: IGpu[]; timestamp?: number } }
+  = | { status: 'ok', gpus: { gpus: IGpu[], timestamp?: number } }
   | { status: 'fetch-failed' }
   | { status: 'health-failed' };
 
@@ -143,7 +141,7 @@ function classifyResult(data: AgentFetchResult): ClassifiedResult {
   }
 
   // Validate GPU data structure before trusting it
-  const validated = validateGpuResponse(data.gpus as unknown);
+  const validated = validateGpuResponse(data.gpus);
   if (!validated) {
     logger.warn('GPU data failed validation — rejecting response');
 
@@ -390,7 +388,7 @@ export function loadSettings(): Settings {
       const validated = parseSettings(parsed);
       if (validated) {
         // Merge with defaults so new fields (e.g. notifications) don't crash
-        return { ...DEFAULT_SETTINGS, ...validated } as Settings;
+        return { ...DEFAULT_SETTINGS, ...validated };
       }
       logger.warn('Settings file found but invalid — using defaults');
     }
@@ -410,7 +408,7 @@ export function saveSettings(settings: unknown): boolean {
     return false;
   }
   try {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(validated, null, 2), 'utf-8');
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(validated, null, 2), { mode: 0o600, encoding: 'utf-8' });
 
     return true;
   } catch (err) {
@@ -494,6 +492,7 @@ function createMainWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
@@ -598,14 +597,19 @@ function worstState(
   ...others: Array<'normal' | 'warning' | 'critical'>
 ): 'normal' | 'warning' | 'critical' {
   for (const s of others) {
-    if (s === 'critical') return 'critical';
+    if (s === 'critical') {
+      return 'critical';
+    }
   }
-  if (current === 'warning' || others.includes('warning')) return 'warning';
+  if (current === 'warning' || others.includes('warning')) {
+    return 'warning';
+  }
+
   return 'normal';
 }
 
 /** Evaluate a single temperature against its thresholds. */
-function getTempState(temp: number, thresholds: { warn: number; critical: number }): 'normal' | 'warning' | 'critical' {
+function getTempState(temp: number, thresholds: { warn: number, critical: number }): 'normal' | 'warning' | 'critical' {
   if (temp >= thresholds.critical) {
     return 'critical';
   }
