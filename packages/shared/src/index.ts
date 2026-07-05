@@ -1,6 +1,15 @@
 export { EAgentStatus } from './enums/EAgentStatus';
+export { EIPC } from './enums/EIPC';
 export type { IGpu } from './types/IGpu';
 export type { IAgent } from './types/IAgent';
 export type { ISettings, ITemperatureThresholds, INotificationsConfig, INotificationCooldowns } from './types/ISettings';
 export { DEFAULT_SETTINGS } from './types/ISettings';
-export type { IElectronAPI, GpuDataPayload, FetchResult } from './types/IElectronAPI';
+export type {
+  IElectronAPI,
+  IElectronInvokeApi,
+  IElectronEventApi,
+  GpuDataPayload,
+  FetchResult,
+} from './types/IElectronAPI';
+export type { IpcInvokeMap, IpcEventMap } from './types/IpcChannels';
+export { IpcEventChannels, IpcInvokeChannels } from './types/IpcChannels';

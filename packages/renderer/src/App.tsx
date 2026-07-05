@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
+import { DEFAULT_SETTINGS, EAgentStatus, EIPC } from '@gpu-monitor/shared';
 import type { ISettings } from '@gpu-monitor/shared';
 import type { GpuDataPayload } from '@gpu-monitor/shared';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -74,20 +74,20 @@ export const App: React.FC = () => {
   // Listen for GPU data updates from main process
   useEffect(() => {
     if (window.electronAPI?.onGpuDataUpdate) {
-      window.electronAPI.onGpuDataUpdate((payload) => {
+      const cleanup = window.electronAPI.onGpuDataUpdate((payload) => {
         setAgentState(buildAgentState(payload));
       });
+      return cleanup;
     }
-
-    return () => { /* cleanup handled by main */ };
   }, []);
 
   // Listen for tray menu open settings
   useEffect(() => {
-    if (window.electronAPI) {
-      window.electronAPI.onOpenSettings(() => {
+    if (window.electronAPI?.onOpenSettings) {
+      const cleanup = window.electronAPI.onOpenSettings(() => {
         setShowSettings(true);
       });
+      return cleanup;
     }
   }, []);
 
@@ -96,7 +96,11 @@ export const App: React.FC = () => {
     async (newSettings: ISettings) => {
       setSettings(newSettings);
       if (window.electronAPI) {
-        await window.electronAPI.saveSettings(newSettings);
+        try {
+          await window.electronAPI.saveSettings(newSettings);
+        } catch (err) {
+          console.error('Failed to save settings:', err);
+        }
       }
     },
     [],

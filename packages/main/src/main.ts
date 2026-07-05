@@ -1,4 +1,8 @@
-import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
+import {
+  DEFAULT_SETTINGS,
+  EAgentStatus,
+  EIPC,
+} from '@gpu-monitor/shared';
 import type { IAgent, IGpu } from '@gpu-monitor/shared';
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
 import * as fs from 'fs';
@@ -189,7 +193,7 @@ function updateStaleStatus(agent: IAgent, now: number): void {
 }
 
 function pushToRenderer(): void {
-  mainWindow?.webContents.send('gpu-data-update', {
+  mainWindow?.webContents.send(EIPC.GPU_DATA_UPDATE, {
     agents: agentData.agents,
     gpus: Array.from(agentData.gpus.entries()).map(([id, gpus]) => ({ agentId: id, gpus })),
     lastUpdate: Array.from(agentData.lastUpdate.entries()),
@@ -451,7 +455,7 @@ function createTray(): void {
       click: () => {
         if (mainWindow) {
           mainWindow.show();
-          mainWindow.webContents.send('open-settings');
+          mainWindow.webContents.send(EIPC.OPEN_SETTINGS);
         }
       },
     },
@@ -520,19 +524,19 @@ function createMainWindow(): void {
 // Notification service instance
 const notificationService = new NotificationService();
 
-// IPC handlers
-ipcMain.on('window-close', () => {
+// IPC handlers (renderer-facing — exposed via contextBridge)
+ipcMain.handle(EIPC.WINDOW_CLOSE, () => {
   logger.info('IPC window-close');
   mainWindow?.hide();
+  return undefined;
 });
 
-ipcMain.handle('get-settings', () => {
+ipcMain.handle(EIPC.GET_SETTINGS, () => {
   logger.debug('IPC get-settings');
-
   return loadSettings();
 });
 
-ipcMain.handle('save-settings', (_event, settings: unknown) => {
+ipcMain.handle(EIPC.SAVE_SETTINGS, (_event, settings: unknown) => {
   const s = settings as { agents?: unknown[] };
   const agents = s.agents && Array.isArray(s.agents) ? s.agents.length : 0;
   logger.info({ agents }, 'IPC save-settings');
@@ -546,22 +550,6 @@ ipcMain.handle('save-settings', (_event, settings: unknown) => {
   startPolling(validated);
 
   return true;
-});
-
-ipcMain.on('refresh-agents', () => {
-  logger.info('IPC refresh-agents');
-  const settings = loadSettings();
-  void refreshAllAgents().then(() => {
-    checkStale(settings);
-    notificationService.evaluateAndNotify(agentData, settings);
-    updateTrayFromData();
-    pushToRenderer();
-  });
-});
-
-ipcMain.on('update-tray-tooltip', (_event, text: string) => {
-  logger.debug('IPC update-tray-tooltip', undefined, `tooltip=${text}`);
-  tray?.setToolTip(text);
 });
 
 /** Recompute tray icon from current agent data using per-metric thresholds. */
