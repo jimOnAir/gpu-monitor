@@ -70,12 +70,12 @@ When the user requests a durable behavior change, record it here or in the relev
 |--------|------|---------|
 | agent | `agent/` | C daemon — GPU temperature monitoring HTTP server with NVML + /dev/mem support |
 | shared | `packages/shared/` | TypeScript interfaces and enums shared between Electron main and renderer |
-| main | `packages/main/` | Electron main process — esbuild-bundled with icon generation and desktop integration |
-| renderer | `packages/renderer/` | React dashboard UI — webpack-bundled with domain services and GPU card components |
+| main | `packages/main/` | Electron main process — polling, notification service, tray, IPC, esbuild-bundled |
+| renderer | `packages/renderer/` | React dashboard UI — webpack-bundled, pure display layer, subscribes to IPC |
 
 ## Project Status
 
-Substantially implemented. C agent (`agent/`) is ~30 KB of production code across 5 source files. Electron app has ~85 KB of working TypeScript/React/CSS across 30+ files — full UI with agent polling, settings management, system tray, debug panel, and detailed GPU monitoring.
+Substantially implemented. C agent (`agent/`) is ~30 KB of production code across 5 source files. Electron app has ~85 KB of working TypeScript/React/CSS across 30+ files — full UI with agent polling in main process, native OS notifications, settings management, system tray, debug panel, and detailed GPU monitoring.
 
 See `docs/` Obsidian vault for detailed design specs that guided implementation.
 
@@ -94,14 +94,23 @@ packages/
 ├── shared/         # Types + enums only (no implementation). tsc → dist/
 │   └── src/{types, enums}/
 ├── main/           # Electron main process. esbuild → dist/
-│   └── src/{main.ts, preload.ts, logger.ts, domains/settings/}
+│   └── src/{main.ts, preload.ts, logger.ts}
 └── renderer/       # React UI. webpack → dist/
     └── src/{
         index.tsx, App.tsx,
         components/{GpuCard, GpuDetailModal, Footer, SettingsModal, DebugPanel, GpuBar},
-        domains/{agents/{AgentService, AgentRepository, logger}, dashboard/DashboardService},
-        styles/main.css
+        domains/dashboard/DashboardService,
+        styles/main.css,
+        preload.d.ts
     }
+```
+
+## IPC Flow
+
+```
+Main → Renderer: 'gpu-data-update' (push on every poll cycle)
+  { agents, gpus: [{agentId, gpus}], lastUpdate, fetchResult }
+Renderer → Main: getSettings, saveSettings, onWindowClose, onOpenSettings
 ```
 
 ## Build & Run
@@ -149,5 +158,7 @@ All env vars parsed **inline in `main.c`** — there is no config module.
 
 - **Shared package**: interfaces and enums only. No implementation. Imported by both `main` and `renderer`.
 - **No Electron in services**: platform-agnostic code in `domains/`, inject Electron via constructor.
-- **Settings**: stored at `~/.config/gpu-monitor/settings.json` (gitignored). Shape: `{ agents: [{id, name, url}], refreshInterval, thresholds: {core|junction|vram: {warn, critical}} }`.
+- **Agent polling in main process**: main does HTTP fetching via Node.js `http` module. Renderer receives data via IPC push.
+- **Notifications in main process**: `NotificationService` evaluates thresholds and fires `Electron.Notification`. Renderer is pure display.
+- **Settings**: stored at `~/.config/gpu-monitor/settings.json` (gitignored). Shape: `{ agents: [{id, name, url}], refreshInterval, thresholds: {core|junction|vram: {warn, critical}}, notifications: {enabled, cooldownMs} }`.
 - **Docs**: Obsidian vault format with wiki-links in `docs/`. The Electron App doc has the full implementation spec.

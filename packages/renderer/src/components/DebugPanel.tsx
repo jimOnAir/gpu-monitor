@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
-import type { AgentState, FetchResult } from '../domains/agents/AgentService';
-import type { LogEntry } from '../domains/agents/logger';
-import { logger } from '../domains/agents/logger';
+import type { AgentState, FetchResult } from '../types/AgentState';
 
 interface DebugPanelProps {
   agentState: AgentState;
@@ -26,35 +24,7 @@ const FETCH_RESULT_COLORS: Record<FetchResult, string> = {
   'error': '#F44336',
 };
 
-const LOG_LEVEL_ICONS: Record<string, string> = {
-  'info': 'i',
-  'warn': '!',
-  'error': 'x',
-};
-
-const LOG_LEVEL_COLORS: Record<string, string> = {
-  'info': '#88C0D0',
-  'warn': '#FFC107',
-  'error': '#F44336',
-};
-
 export const DebugPanel: React.FC<DebugPanelProps> = ({ agentState, visible, onToggle }) => {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
-    setLogs(logger.getEntries());
-    const interval = setInterval(() => {
-      setLogs(logger.getEntries());
-    }, 1000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [visible]);
-
   if (!visible) {
     return null;
   }
@@ -130,25 +100,6 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ agentState, visible, onT
             </div>
           );
         })}
-
-        {/* Log entries */}
-        <div className="debug-log-section">
-          <div className="debug-log-title">Log ({logs.length})</div>
-          <div className="debug-log-entries">
-            {logs.slice(0, 20).map((log, i) => (
-              <div key={i} className={`debug-log-entry debug-log-${log.level}`}>
-                <span className="debug-log-time">
-                  {new Date(log.ts).toISOString().substring(11, 23)}
-                </span>
-                <span className="debug-log-icon" style={{ color: LOG_LEVEL_COLORS[log.level] }}>
-                  [{LOG_LEVEL_ICONS[log.level]}]
-                </span>
-                <span className="debug-log-agent">{log.agent ? `${log.agent}: ` : ''}</span>
-                <span className="debug-log-msg">{log.message}</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

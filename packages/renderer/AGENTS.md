@@ -1,7 +1,7 @@
 # React Renderer UI
 
 ## Purpose
-React-based GPU monitoring dashboard. Displays clickable GPU cards with temp/utilization/power, detail modals, settings management, debug panel, and live agent polling.
+React-based GPU monitoring dashboard. Displays clickable GPU cards with temp/utilization/power, detail modals, settings management, debug panel. Pure display layer — receives data via IPC from main process.
 
 ## Ownership
 `packages/renderer/` directory. Bundled with **webpack** via `webpack.config.js` to `dist/`.
@@ -12,6 +12,8 @@ React-based GPU monitoring dashboard. Displays clickable GPU cards with temp/uti
 - Agent context lives in the section header above each GPU grid
 - CSS is in `src/styles/main.css`
 - Domain services are platform-agnostic (no Electron imports in `domains/`)
+- No polling — receives `gpu-data-update` via IPC from main process
+- `preload.d.ts` defines the Electron API surface for the renderer
 
 ## Work Guidance
 
@@ -27,7 +29,7 @@ App.tsx (root orchestrator)
 │   │           └── GpuCard (clickable → opens GpuDetailModal)
 │   └── Empty state (no GPU data)
 ├── Footer (last update time, refresh interval)
-├── SettingsModal
+├── SettingsModal (includes notifications section)
 ├── GpuDetailModal (full GPU info, auto-updates from live state)
 └── DebugPanel (floating, toggleable)
 ```
@@ -35,18 +37,15 @@ App.tsx (root orchestrator)
 **Key components:**
 - **GpuCard** — compact summary (temps, utilization, power). Click opens detail modal.
 - **GpuDetailModal** — full GPU breakdown (identity, temps w/ thresholds, performance, utilization, power). Resolves GPU data live from `agentState` on every render.
-- **AgentService** — polls agents every `refreshInterval` (default 5s), detects stale/offline agents, manages GPU data Maps.
 - **DashboardService** — aggregates GPU data across agents for display (groups by agent, flattens, finds critical GPU).
 
 **State flow:**
-1. AgentService polls agent endpoints → updates `gpus: Map<agentId, IGpu[]>`
-2. App subscribes → re-renders with new GPU data
+1. Main process polls agents, evaluates notifications, pushes `gpu-data-update` to renderer via IPC
+2. App subscribes → rebuilds `AgentState` from payload → re-renders with new GPU data
 3. Click GPU card → `selectedGpu` state set → GpuDetailModal opens
 4. Modal resolves GPU live from `agentState.gpus` → updates automatically as data refreshes
 
 ### Domain Services
-- `domains/agents/AgentService.ts` — polling and stale detection
-- `domains/agents/AgentRepository.ts` — agent config management
 - `domains/dashboard/DashboardService.ts` — cross-agent aggregation
 
 ### Building

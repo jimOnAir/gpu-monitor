@@ -23,7 +23,8 @@ Runs `tsc` against `tsconfig.json`, outputs to `dist/`.
 ### Key Types
 - `IGpu` — GPU identity, temps, utilization, power
 - `IAgent` — agent endpoint configuration
-- `ISettings` — app settings (agents list, refresh interval, thresholds)
+- `ISettings` — app settings (agents list, refresh interval, thresholds, notifications config)
+- `INotificationsConfig` — notifications settings (enabled, cooldownMs)
 - `EAgentStatus` — enum for agent connection states
 
 ## Verification

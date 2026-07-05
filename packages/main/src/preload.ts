@@ -14,13 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSettings: async (settings: unknown): Promise<boolean> =>
     ipcRenderer.invoke('save-settings', settings) as Promise<boolean>,
 
-  /** Trigger a manual refresh of all agents. */
-  onRefreshAgents: (callback: () => void) => {
-    ipcRenderer.on('refresh-agents', () => {
-      callback();
-    });
-  },
-
   /** Open the settings modal. */
   onOpenSettings: (callback: () => void) => {
     ipcRenderer.on('open-settings', () => {
@@ -33,13 +26,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('window-close');
   },
 
-  /** Notify main process of max GPU temperature to update tray icon. */
-  updateTrayTemp: (maxTemp: number, warn: number, critical: number) => {
-    ipcRenderer.send('update-tray-temp', { maxTemp, warn, critical });
-  },
-
-  /** Update the system tray tooltip with GPU status text. */
-  updateTrayTooltip: (text: string) => {
-    ipcRenderer.send('update-tray-tooltip', text);
+  /** Push GPU data from main process to renderer. */
+  onGpuDataUpdate: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('gpu-data-update', (_event, data) => {
+      callback(data);
+    });
   },
 });

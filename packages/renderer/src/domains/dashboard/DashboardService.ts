@@ -1,7 +1,7 @@
 import type { IGpu } from '@gpu-monitor/shared';
 import { EAgentStatus } from '@gpu-monitor/shared';
 
-import type { AgentState } from '../agents/AgentService';
+import type { AgentState } from '../../types/AgentState';
 
 /**
  * DashboardService: aggregates data from multiple agents for display.

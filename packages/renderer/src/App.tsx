@@ -7,27 +7,54 @@ import { Footer } from './components/Footer';
 import { GpuCard } from './components/GpuCard';
 import { GpuDetailModal } from './components/GpuDetailModal';
 import { SettingsModal } from './components/SettingsModal';
-import type { AgentState } from './domains/agents/AgentService';
-import { AgentService } from './domains/agents/AgentService';
 import { DashboardService } from './domains/dashboard/DashboardService';
 import './styles/main.css';
+import type { AgentState, FetchResult } from './types/AgentState';
+
+interface GpuDataPayload {
+  agents: import('@gpu-monitor/shared').IAgent[];
+  gpus: Array<{ agentId: string, gpus: import('@gpu-monitor/shared').IGpu[] }>;
+  lastUpdate: Array<[string, number]>;
+  lastFetchTimestamp: Array<[string, number]>;
+  statusChangedAt: Array<[string, number]>;
+  fetchResult: Array<[string, FetchResult]>;
+}
+
+// ---------- Window type declarations ----------
 
 declare global {
   interface Window {
     electronAPI?: {
       getSettings: () => Promise<ISettings | null>,
       saveSettings: (settings: ISettings) => Promise<boolean>,
-      onRefreshAgents: (callback: () => void) => void,
       onOpenSettings: (callback: () => void) => void,
       onWindowClose: () => void,
-      updateTrayTemp: (maxTemp: number, warn: number, critical: number) => void,
-      updateTrayTooltip: (text: string) => void,
+      onGpuDataUpdate: (callback: (data: GpuDataPayload) => void) => void,
     };
   }
 }
 
-const agentService = new AgentService();
+// ---------- Services ----------
+
 const dashboardService = new DashboardService();
+
+/** Rebuild AgentState from IPC payload. */
+function buildAgentState(payload: GpuDataPayload): AgentState {
+  const gpus = new Map<string, import('@gpu-monitor/shared').IGpu[]>();
+  for (const { agentId, gpus: gpuList } of payload.gpus) {
+    gpus.set(agentId, gpuList);
+  }
+  return {
+    agents: payload.agents,
+    gpus,
+    lastUpdate: new Map(payload.lastUpdate),
+    lastFetchTimestamp: new Map(payload.lastFetchTimestamp),
+    statusChangedAt: new Map(payload.statusChangedAt),
+    fetchResult: new Map(payload.fetchResult),
+  };
+}
+
+// ---------- App ----------
 
 export const App: React.FC = () => {
   const [settings, setSettings] = useState<ISettings>(DEFAULT_SETTINGS);
@@ -47,15 +74,6 @@ export const App: React.FC = () => {
   } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
-  const [_error, setError] = useState<string | undefined>();
-
-  const handleWindowClose = useCallback(() => {
-    if (window.electronAPI?.onWindowClose) {
-      window.electronAPI.onWindowClose();
-    } else {
-      window.close();
-    }
-  }, []);
 
   // Load settings from Electron API on mount
   useEffect(() => {
@@ -74,82 +92,29 @@ export const App: React.FC = () => {
     void loadSettings();
   }, []);
 
-  // Initialize agent service with settings
+  // Listen for GPU data updates from main process
   useEffect(() => {
-    agentService.initialize(settings);
+    if (window.electronAPI?.onGpuDataUpdate) {
+      window.electronAPI.onGpuDataUpdate((payload) => {
+        console.log('GPU data update received:', {
+          agentCount: payload.agents.length,
+          agents: payload.agents.map((a: { id: string, status: string }) => ({ id: a.id, status: a.status })),
+          gpuCount: payload.gpus.reduce((sum: number, g: { gpus: unknown[] }) => sum + g.gpus.length, 0),
+        });
+        setAgentState(buildAgentState(payload));
+      });
+    }
+    return () => { /* cleanup handled by main */ };
+  }, []);
 
-    const unsubscribe = agentService.subscribe((state) => {
-      setAgentState(state);
-
-      // Check for errors
-      const offlineAgents = state.agents.filter(
-        (a) => a.status === EAgentStatus.Offline && a.lastError,
-      );
-      if (offlineAgents.length > 0) {
-        setError(`${offlineAgents.length} agent(s) offline: ${offlineAgents[0].lastError}`);
-      } else {
-        setError(undefined);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      agentService.stopPolling();
-    };
-  }, [settings]);
-
-  // Listen for manual refresh from tray
+  // Listen for tray menu open settings
   useEffect(() => {
     if (window.electronAPI) {
-      window.electronAPI.onRefreshAgents(() => {
-        agentService.refreshAll();
-      });
       window.electronAPI.onOpenSettings(() => {
         setShowSettings(true);
       });
     }
   }, []);
-
-  // Update tray icon based on max temperature across all GPUs
-  useEffect(() => {
-    if (!window.electronAPI) {
-      return;
-    }
-
-    let maxTemp = 0;
-    agentState.gpus.forEach((gpus) => {
-      gpus.forEach((gpu) => {
-        maxTemp = Math.max(maxTemp, gpu.coreTemp, gpu.junctionTemp, gpu.vramTemp);
-      });
-    });
-
-    if (maxTemp >= 0) {
-      window.electronAPI.updateTrayTemp(
-        maxTemp,
-        settings.thresholds.core.warn,
-        settings.thresholds.core.critical,
-      );
-    }
-  }, [agentState.gpus, settings.thresholds.core]);
-
-  // Update tray tooltip with full GPU status
-  useEffect(() => {
-    if (!window.electronAPI || agentState.gpus.size === 0) {
-      return;
-    }
-
-    const parts: string[] = [];
-    agentState.gpus.forEach((gpus) => {
-      gpus.forEach((gpu) => {
-        parts.push(
-          `${gpu.name} | ${gpu.coreTemp}/${gpu.junctionTemp}/${gpu.vramTemp}C ${gpu.gpuUtilization}% ${Math.round(gpu.powerUsage)}W`,
-        );
-      });
-    });
-
-    const tooltip = parts.join('  ') || 'GPU Monitor';
-    window.electronAPI.updateTrayTooltip(tooltip);
-  }, [agentState.gpus]);
 
   // Save settings when they change
   const handleSaveSettings = useCallback(
@@ -158,7 +123,6 @@ export const App: React.FC = () => {
       if (window.electronAPI) {
         await window.electronAPI.saveSettings(newSettings);
       }
-      agentService.updateSettings(newSettings);
     },
     [],
   );
@@ -206,7 +170,13 @@ export const App: React.FC = () => {
           }} title="Settings">
             ⚙
           </button>
-          <button className="control-btn control-btn-close" onClick={handleWindowClose} title="Close">
+          <button className="control-btn control-btn-close" onClick={() => {
+            if (window.electronAPI?.onWindowClose) {
+              window.electronAPI.onWindowClose();
+            } else {
+              window.close();
+            }
+          }} title="Close">
             ✕
           </button>
         </div>
@@ -354,6 +324,8 @@ export const UnreachableAgent: React.FC<UnreachableAgentProps> = ({ agent }) => 
 
 function getAgentStatusBadge(status?: EAgentStatus): string {
   switch (status) {
+    case EAgentStatus.Pending:
+      return 'Pending';
     case EAgentStatus.Online:
       return 'Online';
     case EAgentStatus.Offline:
@@ -364,4 +336,3 @@ function getAgentStatusBadge(status?: EAgentStatus): string {
       return 'Unknown';
   }
 }
-

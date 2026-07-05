@@ -1,4 +1,4 @@
-import type { ISettings, IAgent, ITemperatureThresholds } from '@gpu-monitor/shared';
+import type { ISettings, IAgent, ITemperatureThresholds, INotificationCooldowns } from '@gpu-monitor/shared';
 import { EAgentStatus } from '@gpu-monitor/shared';
 import React, { useState, useEffect } from 'react';
 
@@ -18,12 +18,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [agents, setAgents] = useState<IAgent[]>(settings.agents);
   const [refreshInterval, setRefreshInterval] = useState(settings.refreshInterval);
   const [thresholds, setThresholds] = useState<ITemperatureThresholds>(settings.thresholds);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notifications.enabled);
+  const [cooldowns, setCooldowns] = useState<INotificationCooldowns>(settings.notifications.cooldowns);
 
   useEffect(() => {
     if (isOpen) {
       setAgents(settings.agents);
       setRefreshInterval(settings.refreshInterval);
       setThresholds(settings.thresholds);
+      setNotificationsEnabled(settings.notifications.enabled);
+      setCooldowns(settings.notifications.cooldowns);
     }
   }, [isOpen, settings]);
 
@@ -36,6 +40,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       agents,
       refreshInterval,
       thresholds,
+      notifications: {
+        enabled: notificationsEnabled,
+        cooldowns,
+      },
     };
     onSave(newSettings);
     onClose();
@@ -194,6 +202,109 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
             ))}
+          </section>
+
+          {/* Notifications */}
+          <section className="modal-section">
+            <h3>Notifications</h3>
+            <div className="notifications-row">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={notificationsEnabled}
+                  onChange={(e) => {
+                    setNotificationsEnabled(e.target.checked);
+                  }}
+                />
+                Enable system notifications
+              </label>
+            </div>
+            <div className="cooldowns-grid">
+              <div className="cooldown-row">
+                <label>Temperature Critical</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={cooldowns.tempCritical / 1000}
+                  onChange={(e) => {
+                    setCooldowns({ ...cooldowns, tempCritical: Number(e.target.value) * 1000 });
+                  }}
+                  className="threshold-input"
+                />
+                <span>s</span>
+              </div>
+              <div className="cooldown-row">
+                <label>Temperature Warning</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={cooldowns.tempWarn / 1000}
+                  onChange={(e) => {
+                    setCooldowns({ ...cooldowns, tempWarn: Number(e.target.value) * 1000 });
+                  }}
+                  className="threshold-input"
+                />
+                <span>s</span>
+              </div>
+              <div className="cooldown-row">
+                <label>Temperature Recovered</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={cooldowns.tempRecover / 1000}
+                  onChange={(e) => {
+                    setCooldowns({ ...cooldowns, tempRecover: Number(e.target.value) * 1000 });
+                  }}
+                  className="threshold-input"
+                />
+                <span>s</span>
+              </div>
+              <div className="cooldown-row">
+                <label>Agent Offline</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={cooldowns.agentOffline / 1000}
+                  onChange={(e) => {
+                    setCooldowns({ ...cooldowns, agentOffline: Number(e.target.value) * 1000 });
+                  }}
+                  className="threshold-input"
+                />
+                <span>s</span>
+              </div>
+              <div className="cooldown-row">
+                <label>Agent Online</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={cooldowns.agentOnline / 1000}
+                  onChange={(e) => {
+                    setCooldowns({ ...cooldowns, agentOnline: Number(e.target.value) * 1000 });
+                  }}
+                  className="threshold-input"
+                />
+                <span>s</span>
+              </div>
+              <div className="cooldown-row">
+                <label>All GPUs Recovered</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={cooldowns.allRecovered / 1000}
+                  onChange={(e) => {
+                    setCooldowns({ ...cooldowns, allRecovered: Number(e.target.value) * 1000 });
+                  }}
+                  className="threshold-input"
+                />
+                <span>s</span>
+              </div>
+            </div>
           </section>
         </div>
 
