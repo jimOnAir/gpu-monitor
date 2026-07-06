@@ -4,13 +4,13 @@ import { ipcMain } from 'electron';
 import type { Logger } from 'pino';
 
 import type { IPollingService } from './domains/polling/IPollingService';
-import type { ISettingsService } from './domains/settings/ISettingsService';
+import type { ISettingsRepository } from './domains/settings/ISettingsService';
 import type { IWindowService } from './domains/windows/IWindowService';
 import { parseSettings } from './settings';
 
 export class IpcHandler {
   constructor(
-    private readonly settingsService: ISettingsService,
+    private readonly settingsRepository: ISettingsRepository,
     private readonly pollingService: IPollingService,
     private readonly windowService: IWindowService,
     private readonly logger: Logger,
@@ -38,7 +38,7 @@ export class IpcHandler {
     ipcMain.handle(EIPC.GET_SETTINGS, (): IpcResult<ISettings | null> => {
       this.logger.debug('IPC get-settings');
 
-      return { success: true, data: this.settingsService.load() };
+      return { success: true, data: this.settingsRepository.load() };
     });
 
     ipcMain.handle(EIPC.OPEN_PREFERENCES, (): IpcResult<void> => {
@@ -57,7 +57,7 @@ export class IpcHandler {
       }
       const agents = validated.agents.length;
       this.logger.info({ agents }, 'IPC save-settings');
-      if (!this.settingsService.save(validated)) {
+      if (!this.settingsRepository.save(validated)) {
         return { success: false, error: 'Failed to write settings file' };
       }
       this.pollingService.startPolling(validated);

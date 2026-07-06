@@ -1,22 +1,17 @@
-import { EAgentStatus, type IAgent, type IGpu, type INotificationCooldowns, type ISettings, type ITemperatureThresholds } from '@gpu-monitor/shared';
+import { EAgentStatus, type IAgent, type IGpu, type INotificationCooldowns, type ISettings } from '@gpu-monitor/shared';
+import type { AgentData, FetchResult } from '@gpu-monitor/shared';
 
 import type { Logger } from '../../logger';
-import type { AgentData, FetchResult } from '../polling/AgentData';
 
 import type { INotificationDispatcher } from './INotificationDispatcher';
 import type { INotificationService } from './INotificationService';
+import { NotificationTextFormatter, type NotificationType, TYPE_TO_COOLDOWN_KEY } from './NotificationTextFormatter';
+import { TemperatureEvaluator } from './TemperatureEvaluator';
 
-type NotificationType = 'temp:critical' | 'temp:warn' | 'temp:recover' | 'agent:offline' | 'agent:online' | 'all:recovered';
-
-const TYPE_TO_COOLDOWN_KEY: Record<NotificationType, keyof INotificationCooldowns> = {
-  'temp:critical': 'tempCritical',
-  'temp:warn': 'tempWarn',
-  'temp:recover': 'tempRecover',
-  'agent:offline': 'agentOffline',
-  'agent:online': 'agentOnline',
-  'all:recovered': 'allRecovered',
-};
-
+/**
+ * Evaluates GPU temperature and agent status against configured thresholds,
+ * and dispatches native OS notifications with per-trigger cooldowns.
+ */
 export class NotificationService implements INotificationService {
   private lastStates = new Map<string, 'normal' | 'warning' | 'critical'>();
   private allRecovered = new Map<string, boolean>();
@@ -25,6 +20,8 @@ export class NotificationService implements INotificationService {
   constructor(
     private readonly logger: Logger,
     private readonly notificationDispatcher: INotificationDispatcher,
+    private readonly temperatureEvaluator = new TemperatureEvaluator(),
+    private readonly textFormatter = new NotificationTextFormatter(),
   ) {}
 
   evaluateAndNotify(data: AgentData, settings: ISettings): void {
@@ -54,12 +51,12 @@ export class NotificationService implements INotificationService {
     const agentId = agent.id;
     const agentName = agent.name;
     const prev = this.lastStates.get(agentId) ?? 'normal';
-    const metrics = this.gatherMetrics(gpuList, settings.thresholds);
+    const metrics = this.temperatureEvaluator.gatherMetrics(gpuList, settings.thresholds);
     const cooldowns = settings.notifications.cooldowns;
     let maxStatus: 'normal' | 'warning' | 'critical' = 'normal';
 
     for (const metric of metrics) {
-      const status = this.evaluateMetric(metric.temp, metric.warn, metric.critical);
+      const status = this.temperatureEvaluator.evaluateMetric(metric.temp, metric.warn, metric.critical);
       maxStatus = this.dispatchMetric(metric, status, prev, agentId, agentName, maxStatus, hadWarning, cooldowns);
     }
 
@@ -154,39 +151,6 @@ export class NotificationService implements INotificationService {
     }
   }
 
-  private evaluateMetric(temp: number, warn: number, critical: number): 'normal' | 'warning' | 'danger' {
-    if (temp >= critical) {
-      return 'danger';
-    }
-    if (temp >= warn) {
-      return 'warning';
-    }
-
-    return 'normal';
-  }
-
-  private gatherMetrics(gpuList: IGpu[], thresholds: ITemperatureThresholds) {
-    const metrics: Array<{ metric: string, temp: number, warn: number, critical: number, status: 'normal' | 'warning' | 'danger' }> = [];
-    const keyMap: Array<{ key: keyof ITemperatureThresholds, tempKey: keyof IGpu, statusKey: keyof IGpu }> = [
-      { key: 'core', tempKey: 'coreTemp', statusKey: 'coreStatus' },
-      { key: 'junction', tempKey: 'junctionTemp', statusKey: 'junctionStatus' },
-      { key: 'vram', tempKey: 'vramTemp', statusKey: 'vramStatus' },
-    ];
-    for (const gpu of gpuList) {
-      for (const { key, tempKey, statusKey } of keyMap) {
-        metrics.push({
-          metric: key,
-          temp: gpu[tempKey] as number,
-          warn: thresholds[key].warn,
-          critical: thresholds[key].critical,
-          status: gpu[statusKey] as 'normal' | 'warning' | 'danger',
-        });
-      }
-    }
-
-    return metrics;
-  }
-
   private fireNotification(
     type: NotificationType, agentId: string, metric: string, agentName: string,
     value: string, icon: string, cooldowns: INotificationCooldowns,
@@ -200,38 +164,11 @@ export class NotificationService implements INotificationService {
     }
     this.cooldowns.set(cooldownKey, now);
 
-    const title = this.buildNotificationTitle(type, agentName, metric);
-    const body = this.buildNotificationBody(type, agentName, metric, value);
+    const title = this.textFormatter.buildNotificationTitle(type, agentName, metric);
+    const body = this.textFormatter.buildNotificationBody(type, agentName, metric);
     const iconPath = `../../assets/${icon}`;
 
     this.notificationDispatcher.show({ title, body, icon: iconPath, silent: false });
     this.logger.info({ type, agentId, metric, value }, `Notification fired: ${title}`);
-  }
-
-  private buildNotificationTitle(type: NotificationType, agentName: string, metric: string): string {
-    const metricLabel = metric ? ` — ${metric.charAt(0).toUpperCase() + metric.slice(1)}` : '';
-    const titles: Record<NotificationType, string> = {
-      'temp:critical': `GPU Temperature Critical${metricLabel} — ${agentName}`,
-      'temp:warn': `GPU Temperature Warning${metricLabel} — ${agentName}`,
-      'temp:recover': `GPU Temperature Recovered${metricLabel} — ${agentName}`,
-      'agent:offline': `Agent Offline — ${agentName}`,
-      'agent:online': `Agent Online — ${agentName}`,
-      'all:recovered': `All GPUs Recovered — ${agentName}`,
-    };
-
-    return titles[type];
-  }
-
-  private buildNotificationBody(type: NotificationType, agentName: string, metric: string, _value: string): string {
-    const bodies: Record<NotificationType, string> = {
-      'temp:critical': `${metric} temperature exceeded critical threshold on ${agentName}.`,
-      'temp:warn': `${metric} temperature exceeded warning threshold on ${agentName}.`,
-      'temp:recover': `${metric} temperature returned to normal on ${agentName}.`,
-      'agent:offline': `Agent ${agentName} is not responding.`,
-      'agent:online': `Agent ${agentName} is back online.`,
-      'all:recovered': `All GPU temperatures on ${agentName} are within normal range.`,
-    };
-
-    return bodies[type];
   }
 }

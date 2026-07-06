@@ -3,14 +3,16 @@ import { app, nativeImage } from 'electron';
 import * as path from 'path';
 
 import type { IIconLoader } from '../../domains/tray/IIconLoader';
-import logger from '../../logger';
+import type { Logger } from '../../logger';
 
 export class ElectronIconLoader implements IIconLoader {
+  constructor(private readonly logger: Logger) {}
+
   loadIcon(name: string): NativeImage {
     const iconPath = path.join(__dirname, '../../assets', `${name}.png`);
     const img = nativeImage.createFromPath(iconPath);
     if (img.isEmpty()) {
-      logger.warn({ iconPath }, 'Icon file not found or invalid');
+      this.logger.warn({ iconPath }, 'Icon file not found or invalid');
     }
 
     return img;
@@ -26,8 +28,7 @@ export class ElectronIconLoader implements IIconLoader {
     }
     const img = nativeImage.createFromPath(iconPath);
     if (img.isEmpty()) {
-      logger.warn({ iconPath }, 'Build icon not found, using default tray icon');
-
+      this.logger.warn({ iconPath }, 'Build icon not found, using default tray icon');
       return nativeImage.createEmpty();
     }
 

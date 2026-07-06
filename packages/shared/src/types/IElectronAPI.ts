@@ -1,13 +1,12 @@
 import type { IAgent } from './IAgent';
 import type { IGpu } from './IGpu';
+import type { FetchResult } from './AgentData';
 import type { IpcEventMap, IpcInvokeMap } from './IpcChannels';
 
 /**
  * Type-safe IPC payload between the Electron main process and renderer.
  * Both `preload.ts` and the renderer consume this module for identical types.
  */
-
-export type FetchResult = 'pending' | 'ok' | 'fetch-failed' | 'health-failed' | 'error';
 
 export interface GpuDataPayload {
   agents: IAgent[];

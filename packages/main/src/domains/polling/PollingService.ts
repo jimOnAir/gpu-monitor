@@ -1,27 +1,21 @@
-import { DEFAULT_SETTINGS, type IAgent, type IGpu, type ISettings } from '@gpu-monitor/shared';
-import { EAgentStatus } from '@gpu-monitor/shared';
+import { DEFAULT_SETTINGS, EAgentStatus, type IAgent, type ISettings } from '@gpu-monitor/shared';
 
-import { validateGpuResponse } from '../../gpu-validation';
-import type { IHttpAdapter } from '../../infrastructure/electron/NodeHttpAdapter';
 import type { Logger } from '../../logger';
 import type { INotificationService } from '../notifications/INotificationService';
-import type { ISettingsService } from '../settings/ISettingsService';
+import type { ISettingsRepository } from '../settings/ISettingsService';
 import type { ITrayService } from '../tray/ITrayService';
 import type { IWindowService } from '../windows/IWindowService';
 
-import type { AgentData, PollingHandlers } from './AgentData';
+import type { PollingHandlers } from './AgentData';
 import type { IPollingService } from './IPollingService';
+import { AgentPoller } from './AgentPoller';
+import { StaleDetector, STALE_CHECK_INTERVAL_MS } from './StaleDetector';
+import type { AgentData } from '@gpu-monitor/shared';
 
-const STALE_CHECK_INTERVAL_MS = 5000;
-const MIN_STALE_THRESHOLD_MS = 15000;
-
-interface IGpuResponse { gpus: IGpu[]; timestamp?: number }
-interface AgentFetchResult { gpus: IGpuResponse | null; healthOk: boolean }
-type ClassifiedResult
-  = | { status: 'ok', gpus: { gpus: IGpu[], timestamp?: number } }
-  | { status: 'fetch-failed' }
-  | { status: 'health-failed' };
-
+/**
+ * Orchestrates agent polling: manages HTTP fetch lifecycle, stale detection intervals,
+ * and delegates data classification to AgentPoller and stale checks to StaleDetector.
+ */
 export class PollingService implements IPollingService {
   private pollingInterval: ReturnType<typeof setInterval> | null = null;
   private staleCheckInterval: ReturnType<typeof setInterval> | null = null;
@@ -39,11 +33,13 @@ export class PollingService implements IPollingService {
 
   constructor(
     private readonly logger: Logger,
-    private readonly httpAdapter: IHttpAdapter,
-    private readonly settingsService: ISettingsService,
+    private readonly httpAdapter: import('../../infrastructure/electron/NodeHttpAdapter').IHttpAdapter,
+    private readonly settingsRepository: ISettingsRepository,
     private readonly notificationService: INotificationService,
     private readonly trayService: ITrayService,
     private readonly windowService: IWindowService,
+    private readonly agentPoller: AgentPoller = new AgentPoller(logger, httpAdapter),
+    private readonly staleDetector: StaleDetector = new StaleDetector(),
   ) {}
 
   getAgentData(): AgentData {
@@ -86,6 +82,9 @@ export class PollingService implements IPollingService {
         cb.evaluateAndNotify(this.agentData, settings);
         cb.updateTrayFromData();
         cb.pushToRenderer();
+        this.logger.info('polling interval callback executed');
+      }).catch((error) => {
+        this.logger.error({ error: String(error) }, 'polling interval callback failed');
       });
     }, settings.refreshInterval);
 
@@ -110,16 +109,19 @@ export class PollingService implements IPollingService {
       this.agentData.prevAgentStatus.set(agent.id, agent.status ?? EAgentStatus.Pending);
     }
     await Promise.allSettled(this.agentData.agents.map(async (a) => this.pollAgent(a)));
+
+    // Log the result of the polling cycle
+    const gpuCount = Array.from(this.agentData.gpus.values()).reduce((sum, gpus) => sum + gpus.length, 0);
+    this.logger.info({
+      gpuCount,
+      agents: this.agentData.agents.map((a) => ({ id: a.id, status: a.status })),
+      fetchResults: Array.from(this.agentData.fetchResult.entries()),
+    }, 'polling cycle completed');
   }
 
   private async pollAgent(agent: IAgent): Promise<void> {
-    const raw = await this.fetchAgentData(agent);
-    if (!raw) {
-      this.setAgentStatus(agent.id, EAgentStatus.Offline, 'Failed to fetch /gpu');
-
-      return;
-    }
-    const classified = this.classifyResult(raw);
+    const raw = await this.agentPoller.fetchAgentData(agent);
+    const classified = this.agentPoller.classifyResult(raw);
     this.agentData.fetchResult.set(agent.id, classified.status);
     this.agentData.lastFetchTimestamp.set(agent.id, Date.now());
     if (classified.status === 'ok') {
@@ -132,44 +134,6 @@ export class PollingService implements IPollingService {
       const error = classified.status === 'fetch-failed' ? 'Failed to fetch /gpu' : undefined;
       this.setAgentStatus(agent.id, EAgentStatus.Offline, error);
     }
-  }
-
-  private async fetchAgentData(agent: IAgent): Promise<AgentFetchResult | null> {
-    const fetchUrl = `${agent.url}/gpu`;
-    const healthUrl = `${agent.url}/health`;
-    this.logger.info({ agent: agent.id, fetchUrl, healthUrl }, 'polling agent');
-
-    const [gpuData, healthData] = await Promise.all([
-      this.httpAdapter.getJson<IGpuResponse>(fetchUrl, 5000),
-      this.httpAdapter.getJson<{ status: string }>(healthUrl, 5000),
-    ]);
-
-    const hasGpus = gpuData !== null && Array.isArray(gpuData.gpus);
-    this.logger.info({ agent: agent.id, hasGpus }, 'poll result');
-    const healthOk = healthData?.status === 'ok';
-
-    return { gpus: hasGpus ? gpuData : null, healthOk };
-  }
-
-  private classifyResult(data: AgentFetchResult): ClassifiedResult {
-    if (!data.gpus) {
-      this.logger.warn('No GPU data returned from agent');
-
-      return { status: 'fetch-failed' };
-    }
-    if (!data.healthOk) {
-      this.logger.warn('Agent /health endpoint returned non-ok');
-
-      return { status: 'health-failed' };
-    }
-    const validated = validateGpuResponse(data.gpus);
-    if (!validated) {
-      this.logger.warn('GPU data failed validation — rejecting response');
-
-      return { status: 'fetch-failed' };
-    }
-
-    return { status: 'ok', gpus: validated };
   }
 
   private setAgentStatus(agentId: string, status: EAgentStatus, error: string | undefined): void {
@@ -185,21 +149,6 @@ export class PollingService implements IPollingService {
   }
 
   private checkStale(): void {
-    const now = Date.now();
-    for (const agent of this.agentData.agents) {
-      this.updateStaleStatus(agent, now);
-    }
-  }
-
-  private updateStaleStatus(agent: IAgent, now: number): void {
-    const lastUpdate = this.agentData.lastUpdate.get(agent.id) || 0;
-    const age = now - lastUpdate;
-    if (age > MIN_STALE_THRESHOLD_MS && agent.status === EAgentStatus.Online) {
-      agent.status = EAgentStatus.Stale;
-      this.agentData.statusChangedAt.set(agent.id, now);
-    } else if (age <= MIN_STALE_THRESHOLD_MS && agent.status === EAgentStatus.Stale) {
-      agent.status = EAgentStatus.Online;
-      this.agentData.statusChangedAt.set(agent.id, now);
-    }
+    this.staleDetector.checkStale(this.agentData.agents, this.agentData.lastUpdate);
   }
 }

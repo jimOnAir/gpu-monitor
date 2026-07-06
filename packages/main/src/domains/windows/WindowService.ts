@@ -6,11 +6,11 @@ import * as path from 'path';
 import type { Logger } from '../../logger';
 import type { AgentData } from '../polling/AgentData';
 
-import type { IExternalOpener } from './IExternalOpener';
 import type { IThemeListener, ThemeColor } from './IThemeListener';
 import type { IWindowFactory } from './IWindowFactory';
 import type { IWindowService } from './IWindowService';
 import type { IWindowStatePersister } from './IWindowStatePersister';
+import { NavigationSecurityService } from './NavigationSecurityService';
 
 export type BuildIconFn = () => Electron.NativeImage;
 
@@ -25,7 +25,7 @@ export class WindowService implements IWindowService {
     private readonly logger: Logger,
     private readonly windowFactory: IWindowFactory,
     private readonly buildIcon: BuildIconFn,
-    private readonly externalOpener: IExternalOpener,
+    private readonly navigationSecurity: NavigationSecurityService,
     private readonly themeListener: IThemeListener,
     private readonly mainWindowStatePersister: IWindowStatePersister,
     private readonly preferencesWindowStatePersister: IWindowStatePersister,
@@ -118,15 +118,7 @@ export class WindowService implements IWindowService {
   }
 
   buildTrustedOrigins(settings: ISettings): Set<string> {
-    const origins = new Set<string>();
-    for (const agent of settings.agents) {
-      try {
-        const parsed = new URL(agent.url);
-        origins.add(parsed.origin);
-      } catch { /* skip malformed */ }
-    }
-
-    return origins;
+    return this.navigationSecurity.buildTrustedOrigins(settings.agents);
   }
 
   getMainWindow(): BrowserWindow | null {
@@ -150,33 +142,19 @@ export class WindowService implements IWindowService {
   }
 
   private handleNavigation(event: { preventDefault: () => void }, url: string, trustedOrigins: Set<string>): void {
-    try {
-      const parsed = new URL(url);
-      if (!trustedOrigins.has(parsed.origin)) {
-        event.preventDefault();
-        this.externalOpener.open(url);
-      }
-    } catch {
+    if (!this.navigationSecurity.isTrustedUrl(url, trustedOrigins)) {
       event.preventDefault();
-      this.externalOpener.open(url);
+      this.navigationSecurity.handleNavigation(url, trustedOrigins);
     }
   }
 
   private handleWindowOpen(url: string, trustedOrigins: Set<string>): { action: 'deny' | 'allow' } {
-    try {
-      const parsed = new URL(url);
-      if (!trustedOrigins.has(parsed.origin)) {
-        this.externalOpener.open(url);
-
-        return { action: 'deny' };
-      }
-    } catch {
-      this.externalOpener.open(url);
-
-      return { action: 'deny' };
+    if (this.navigationSecurity.isTrustedUrl(url, trustedOrigins)) {
+      return { action: 'allow' };
     }
+    this.navigationSecurity.handleNavigation(url, trustedOrigins);
 
-    return { action: 'allow' };
+    return { action: 'deny' };
   }
 
   private setupWindowEvents(win: BrowserWindow, onClose: () => void): void {

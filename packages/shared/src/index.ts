@@ -9,7 +9,7 @@ export type {
   IElectronInvokeApi,
   IElectronEventApi,
   GpuDataPayload,
-  FetchResult,
 } from './types/IElectronAPI';
+export type { AgentData, FetchResult } from './types/AgentData';
 export type { IpcInvokeMap, IpcEventMap, IpcResult, UpdateAvailableInfo, UpdateDownloadedInfo } from './types/IpcChannels';
 export { IpcEventChannels, IpcInvokeChannels } from './types/IpcChannels';

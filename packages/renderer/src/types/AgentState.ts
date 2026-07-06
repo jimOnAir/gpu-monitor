@@ -1,11 +1,11 @@
 /**
- * Agent state type shared between App.tsx (rebuilder) and DashboardService (consumer).
- * Extracted to avoid circular imports.
+ * Renderer-side AgentState is an alias for the shared AgentData type.
+ * This eliminates type duplication between main and renderer packages.
  */
-
 import type { IAgent, IGpu } from '@gpu-monitor/shared';
+import type { FetchResult } from '@gpu-monitor/shared';
 
-export type FetchResult = 'pending' | 'ok' | 'fetch-failed' | 'health-failed' | 'error';
+export type { FetchResult } from '@gpu-monitor/shared';
 
 export interface AgentState {
   agents: IAgent[];

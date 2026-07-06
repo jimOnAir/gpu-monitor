@@ -1,4 +1,5 @@
 import type { ISettings } from '@gpu-monitor/shared';
+import type { AgentData } from '@gpu-monitor/shared';
 import type { BrowserWindow } from 'electron';
 import { app } from 'electron';
 import { autoUpdater } from 'electron-updater';
@@ -7,18 +8,17 @@ import * as path from 'path';
 
 import type { INotificationService } from '../../domains/notifications/INotificationService';
 import { NotificationService } from '../../domains/notifications/NotificationService';
-import type { AgentData } from '../../domains/polling/AgentData';
-import type { IPollingService } from '../../domains/polling/IPollingService';
 import { PollingService } from '../../domains/polling/PollingService';
-import type { ISettingsService } from '../../domains/settings/ISettingsService';
+import type { IPollingService } from '../../domains/polling/IPollingService';
 import { SettingsRepository } from '../../domains/settings/SettingsRepository';
-import { SettingsService } from '../../domains/settings/SettingsService';
+import type { ISettingsRepository } from '../../domains/settings/ISettingsService';
 import type { ITrayService } from '../../domains/tray/ITrayService';
 import { TrayService } from '../../domains/tray/TrayService';
 import type { IWindowService } from '../../domains/windows/IWindowService';
 import { WindowService } from '../../domains/windows/WindowService';
+import { NavigationSecurityService } from '../../domains/windows/NavigationSecurityService';
 import { IpcHandler } from '../../IpcHandler';
-import logger from '../../logger';
+import type { Logger } from '../../logger';
 import { MenuService } from '../../MenuService';
 import type { ElectronAdapter } from '../electron/ElectronAdapter';
 
@@ -26,75 +26,69 @@ const MAX_CRASH_COUNT = 3;
 const CRASH_WINDOW_MS = 30 * 60 * 1000;
 
 export class AppBootstrap {
-  private settingsService!: ISettingsService;
+  private settingsRepository!: ISettingsRepository;
   private notificationService!: INotificationService;
   private trayService!: ITrayService;
   private windowService!: IWindowService;
   private pollingService!: IPollingService;
   private menuService!: MenuService;
 
-  constructor(private readonly electronAdapter: ElectronAdapter) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly electronAdapter: ElectronAdapter,
+  ) {}
 
   initialize(): void {
-    // Wire services and infrastructure first
     this.wireServices();
 
-    const settings = this.settingsService.load();
+    const settings = this.settingsRepository.load();
 
-    // Set up crash recovery
     const isCrashLoop = this.recordCrash();
     if (isCrashLoop) {
       void this.showRecoveryDialog();
-
       return;
     }
     this.recordStartup();
 
-    // Set up UI and polling
     this.setupUx(settings);
-
-    // Set up lifecycle handlers
     this.setupLifecycle();
   }
 
   private wireServices(): void {
-    // Wire repositories
-    const settingsRepository = new SettingsRepository(logger, this.electronAdapter.appPath);
-    this.settingsService = new SettingsService(settingsRepository);
+    this.settingsRepository = new SettingsRepository(this.logger, this.electronAdapter.appPath);
 
-    // Wire domain services (in dependency order)
     this.trayService = new TrayService(
-      logger,
+      this.logger,
       this.electronAdapter.trayFactory,
       this.electronAdapter.iconLoader,
     );
+
     this.windowService = new WindowService(
-      logger,
+      this.logger,
       this.electronAdapter.windowFactory,
       () => this.electronAdapter.buildTrayIcon(),
-      this.electronAdapter.externalOpener,
+      new NavigationSecurityService(this.electronAdapter.externalOpener),
       this.electronAdapter.themeListener,
       this.electronAdapter.createWindowStatePersister({ file: 'main-window-state.json', defaultWidth: 720, defaultHeight: 800 }),
       this.electronAdapter.createWindowStatePersister({ file: 'preferences-window-state.json', defaultWidth: 600, defaultHeight: 500 }),
     );
-    this.notificationService = new NotificationService(logger, this.electronAdapter.notificationDispatcher);
 
-    // Wire polling (depends on all other services)
+    this.notificationService = new NotificationService(this.logger, this.electronAdapter.notificationDispatcher);
+
     this.pollingService = new PollingService(
-      logger,
+      this.logger,
       this.electronAdapter.http,
-      this.settingsService,
+      this.settingsRepository,
       this.notificationService,
       this.trayService,
       this.windowService,
     );
 
-    // Wire infrastructure (takes services via constructor)
     const ipcHandler = new IpcHandler(
-      this.settingsService,
+      this.settingsRepository,
       this.pollingService,
       this.windowService,
-      logger,
+      this.logger,
     );
     ipcHandler.register();
 
@@ -103,28 +97,26 @@ export class AppBootstrap {
   }
 
   private setupUx(settings: ISettings): void {
-    // Create tray
     this.trayService.createTray({
       onShow: () => {
-        logger.info({ windowExists: !!this.windowService.getMainWindow() }, 'Tray: Show clicked');
+        this.logger.info({ windowExists: !!this.windowService.getMainWindow() }, 'Tray: Show clicked');
         const win = this.windowService.getMainWindow();
         if (win) {
-          logger.info('Showing window');
           win.show();
         } else {
-          logger.warn('No main window found to show');
+          this.logger.warn('No main window found to show');
         }
       },
       onRefresh: () => {
-        logger.info('Tray: Refresh clicked');
+        this.logger.info('Tray: Refresh clicked');
         this.refreshAgents(settings);
       },
       onOpenSettings: () => {
-        logger.info('Tray: Open settings clicked');
+        this.logger.info('Tray: Open settings clicked');
         this.openPreferences();
       },
       onExit: () => {
-        logger.info('Tray: Exit clicked — quitting app');
+        this.logger.info('Tray: Exit clicked — quitting app');
         this.pollingService.stopPolling();
         const win = this.windowService.getMainWindow();
         if (win) {
@@ -133,12 +125,10 @@ export class AppBootstrap {
         app.quit();
       },
     });
-    logger.info('Tray created successfully with menu');
+    this.logger.info('Tray created successfully with menu');
 
-    // Create main window
     this.windowService.createMainWindow(settings, this.trayService.getTray());
 
-    // Register polling callbacks
     this.pollingService.registerHandlers({
       pushToRenderer: () => {
         this.pushToRenderer();
@@ -151,14 +141,12 @@ export class AppBootstrap {
       },
     });
 
-    // Start theme listener (must be before window creation for initial background)
     this.electronAdapter.themeListener.start();
 
-    // Wait for renderer to be ready before starting polling
     const mainWindow = this.windowService.getMainWindow();
     if (mainWindow) {
       mainWindow.webContents.on('did-finish-load', () => {
-        logger.info('Renderer loaded — starting polling');
+        this.logger.info('Renderer loaded — starting polling');
         this.pollingService.startPolling(settings);
       });
     }
@@ -166,13 +154,10 @@ export class AppBootstrap {
 
   private setupLifecycle(): void {
     const mainWindow = this.windowService.getMainWindow();
-
-    // Auto-update
     this.initializeAutoUpdater(mainWindow);
 
-    // Second-instance handler
     app.on('second-instance', () => {
-      logger.info('Second instance attempted — focusing existing window');
+      this.logger.info('Second instance attempted — focusing existing window');
       const mainWin = this.windowService.getMainWindow();
       if (mainWin) {
         if (mainWin.isMinimized()) {
@@ -183,15 +168,12 @@ export class AppBootstrap {
       }
     });
 
-    // Activate: recreate window if needed
     app.on('activate', () => {
       if (!this.windowService.getMainWindow()) {
-        // Settings will be reloaded from repository
-        this.windowService.createMainWindow(this.settingsService.load(), this.trayService.getTray());
+        this.windowService.createMainWindow(this.settingsRepository.load(), this.trayService.getTray());
       }
     });
 
-    // Before quit: notify window service
     app.on('before-quit', () => {
       this.windowService.setWillQuit(true);
       this.pollingService.stopPolling();
@@ -219,21 +201,21 @@ export class AppBootstrap {
     autoUpdater.autoInstallOnAppQuit = true;
 
     autoUpdater.on('checking-for-update', () => {
-      logger.info('Checking for updates...');
+      this.logger.info('Checking for updates...');
     });
 
     autoUpdater.on('update-available', (info) => {
-      logger.info(`Update available: ${info.version}`);
+      this.logger.info(`Update available: ${info.version}`);
       mainWindow?.webContents.send('UPDATE_AVAILABLE', { version: info.version, releaseNotes: info.releaseNotes });
     });
 
     autoUpdater.on('update-downloaded', (info) => {
-      logger.info(`Update downloaded: ${info.version}`);
+      this.logger.info(`Update downloaded: ${info.version}`);
       mainWindow?.webContents.send('UPDATE_DOWNLOADED', { version: info.version });
     });
 
     autoUpdater.on('error', (err) => {
-      logger.warn({ err: err.message }, 'Auto-update error');
+      this.logger.warn({ err: err.message }, 'Auto-update error');
     });
 
     setImmediate(() => {
@@ -271,12 +253,11 @@ export class AppBootstrap {
   }
 
   private async showRecoveryDialog(): Promise<void> {
-    logger.warn('Crash loop detected — showing recovery dialog');
+    this.logger.warn('Crash loop detected — showing recovery dialog');
     const mainWindow = this.windowService.getMainWindow();
     if (!mainWindow) {
-      logger.error('Main window not available for recovery dialog');
+      this.logger.error('Main window not available for recovery dialog');
       app.quit();
-
       return;
     }
 
@@ -304,7 +285,7 @@ export class AppBootstrap {
         app.relaunch();
         app.exit(0);
       } catch (err) {
-        logger.error({ err: String(err) }, 'Recovery failed');
+        this.logger.error({ err: String(err) }, 'Recovery failed');
         app.quit();
       }
     } else {

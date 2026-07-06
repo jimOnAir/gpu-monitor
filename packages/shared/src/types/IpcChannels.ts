@@ -6,6 +6,7 @@
 
 import { EIPC } from '../enums/EIPC';
 
+import type { FetchResult } from './AgentData';
 import type { GpuDataPayload } from './IElectronAPI';
 import type { ISettings } from './ISettings';
 

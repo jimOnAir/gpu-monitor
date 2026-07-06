@@ -13,15 +13,6 @@ import type { IWindowFactory } from '../../domains/windows/IWindowFactory';
 import type { IWindowStatePersister } from '../../domains/windows/IWindowStatePersister';
 import type { Logger } from '../../logger';
 
-import { ElectronExternalOpener } from './ElectronExternalOpener';
-import { ElectronIconLoader } from './ElectronIconLoader';
-import { ElectronMenuFactory } from './ElectronMenuFactory';
-import { ElectronNotificationDispatcher } from './ElectronNotificationDispatcher';
-import { ElectronThemeListener } from './ElectronThemeListener';
-import { ElectronTrayFactory } from './ElectronTrayFactory';
-import { ElectronWindowFactory } from './ElectronWindowFactory';
-import { ElectronWindowStatePersister } from './ElectronWindowStatePersister';
-import { NodeHttpAdapter } from './NodeHttpAdapter';
 import type { IHttpAdapter } from './NodeHttpAdapter';
 
 export interface IElectronAdapter {
@@ -52,19 +43,29 @@ export class ElectronAdapter implements IElectronAdapter {
   constructor(
     private readonly logger: Logger,
     private readonly electronApp: typeof app,
+    http: IHttpAdapter,
+    notificationDispatcher: INotificationDispatcher,
+    trayFactory: ITrayFactory,
+    windowFactory: IWindowFactory,
+    iconLoader: IIconLoader,
+    themeListener: IThemeListener,
+    externalOpener: IExternalOpener,
+    menuFactory: IMenuFactory,
   ) {
     this.appPath = this.electronApp.getPath('userData');
-    this.http = new NodeHttpAdapter(logger);
-    this.notificationDispatcher = new ElectronNotificationDispatcher();
-    this.trayFactory = new ElectronTrayFactory();
-    this.windowFactory = new ElectronWindowFactory();
-    this.iconLoader = new ElectronIconLoader();
-    this.themeListener = new ElectronThemeListener();
-    this.externalOpener = new ElectronExternalOpener();
-    this.menuFactory = new ElectronMenuFactory();
+    this.http = http;
+    this.notificationDispatcher = notificationDispatcher;
+    this.trayFactory = trayFactory;
+    this.windowFactory = windowFactory;
+    this.iconLoader = iconLoader;
+    this.themeListener = themeListener;
+    this.externalOpener = externalOpener;
+    this.menuFactory = menuFactory;
   }
 
   createWindowStatePersister(options: { file: string, defaultWidth: number, defaultHeight: number }): IWindowStatePersister {
+    const { ElectronWindowStatePersister } = require('./ElectronWindowStatePersister');
+
     return new ElectronWindowStatePersister(options);
   }
 
@@ -79,7 +80,6 @@ export class ElectronAdapter implements IElectronAdapter {
     const img = nativeImage.createFromPath(iconPath);
     if (img.isEmpty()) {
       this.logger.warn({ iconPath }, 'Build icon not found, using default tray icon');
-
       return nativeImage.createEmpty();
     }
     this.logger.info({ iconPath, width: img.getSize().width, height: img.getSize().height }, 'Build icon loaded');

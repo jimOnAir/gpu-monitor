@@ -25,7 +25,7 @@ export class SettingsRepository implements ISettingsRepository {
       if (fs.existsSync(this.settingsFile)) {
         const raw = fs.readFileSync(this.settingsFile, 'utf-8');
         const parsed = JSON.parse(raw) as unknown;
-        const validated = parseSettings(parsed);
+        const validated = parseSettings(parsed, this.logger);
         if (validated) {
           return { ...DEFAULT_SETTINGS, ...validated };
         }
