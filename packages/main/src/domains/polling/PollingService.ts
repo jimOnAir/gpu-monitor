@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS, EAgentStatus, type IAgent, type ISettings } from '@gpu-monitor/shared';
+import type { AgentData } from '@gpu-monitor/shared';
 
 import type { Logger } from '../../logger';
 import type { INotificationService } from '../notifications/INotificationService';
@@ -7,10 +8,11 @@ import type { ITrayService } from '../tray/ITrayService';
 import type { IWindowService } from '../windows/IWindowService';
 
 import type { PollingHandlers } from './AgentData';
+import type { AgentPoller } from './AgentPoller';
+import type { IHttpAdapter } from './IHttpAdapter';
 import type { IPollingService } from './IPollingService';
-import { AgentPoller } from './AgentPoller';
-import { StaleDetector, STALE_CHECK_INTERVAL_MS } from './StaleDetector';
-import type { AgentData } from '@gpu-monitor/shared';
+import type { StaleDetector } from './StaleDetector';
+import { STALE_CHECK_INTERVAL_MS } from './StaleDetector';
 
 /**
  * Orchestrates agent polling: manages HTTP fetch lifecycle, stale detection intervals,
@@ -33,13 +35,13 @@ export class PollingService implements IPollingService {
 
   constructor(
     private readonly logger: Logger,
-    private readonly httpAdapter: import('../../infrastructure/electron/NodeHttpAdapter').IHttpAdapter,
+    private readonly httpAdapter: IHttpAdapter,
     private readonly settingsRepository: ISettingsRepository,
     private readonly notificationService: INotificationService,
     private readonly trayService: ITrayService,
     private readonly windowService: IWindowService,
-    private readonly agentPoller: AgentPoller = new AgentPoller(logger, httpAdapter),
-    private readonly staleDetector: StaleDetector = new StaleDetector(),
+    private readonly agentPoller: AgentPoller,
+    private readonly staleDetector: StaleDetector,
   ) {}
 
   getAgentData(): AgentData {
@@ -83,7 +85,7 @@ export class PollingService implements IPollingService {
         cb.updateTrayFromData();
         cb.pushToRenderer();
         this.logger.info('polling interval callback executed');
-      }).catch((error) => {
+      }).catch((error: unknown) => {
         this.logger.error({ error: String(error) }, 'polling interval callback failed');
       });
     }, settings.refreshInterval);

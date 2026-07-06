@@ -5,7 +5,16 @@ import * as path from 'path';
 
 import type { IWindowFactory } from '../../domains/windows/IWindowFactory';
 
+export interface IThemeColors {
+  dark: string;
+  light: string;
+}
+
 export class ElectronWindowFactory implements IWindowFactory {
+  constructor(
+    private readonly themeColors: IThemeColors = { dark: '#1E2733', light: '#FFFFFF' },
+  ) {}
+
   create(opts: {
     x?: number,
     y?: number,
@@ -21,9 +30,7 @@ export class ElectronWindowFactory implements IWindowFactory {
     titleBarStyle?: 'hidden' | 'default',
     show?: boolean,
   }): BrowserWindow {
-    const darkBg = '#1E2733';
-    const lightBg = '#FFFFFF';
-    const bgColor = opts.backgroundColor || (nativeTheme.shouldUseDarkColors ? darkBg : lightBg);
+    const bgColor = opts.backgroundColor || (nativeTheme.shouldUseDarkColors ? this.themeColors.dark : this.themeColors.light);
 
     return new ElectronBrowserWindow({
       x: opts.x,

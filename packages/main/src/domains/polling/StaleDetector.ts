@@ -2,7 +2,8 @@ import { EAgentStatus } from '@gpu-monitor/shared';
 import type { IAgent } from '@gpu-monitor/shared';
 
 export const STALE_CHECK_INTERVAL_MS = 5000;
-export const MIN_STALE_THRESHOLD_MS = 15000;
+
+const MIN_STALE_THRESHOLD_MS = 15000;
 
 /**
  * Detects stale agent connections based on time since last update.
@@ -13,14 +14,16 @@ export class StaleDetector {
    * Update an agent's status to Stale if it hasn't reported within the threshold.
    * Returns true if the status was changed.
    */
-  updateStaleStatus(agent: IAgent, now: number, lastUpdate: number): { agent: IAgent; changed: boolean } {
+  updateStaleStatus(agent: IAgent, now: number, lastUpdate: number): { agent: IAgent, changed: boolean } {
     const age = now - lastUpdate;
     if (age > MIN_STALE_THRESHOLD_MS && agent.status === EAgentStatus.Online) {
       agent.status = EAgentStatus.Stale;
+
       return { agent, changed: true };
     }
     if (age <= MIN_STALE_THRESHOLD_MS && agent.status === EAgentStatus.Stale) {
       agent.status = EAgentStatus.Online;
+
       return { agent, changed: true };
     }
 

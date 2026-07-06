@@ -1,10 +1,7 @@
 import * as http from 'http';
 
+import type { IHttpAdapter } from '../../domains/polling/IHttpAdapter';
 import type { Logger } from '../../logger';
-
-export interface IHttpAdapter {
-  getJson: <T = unknown>(url: string, timeoutMs?: number) => Promise<T | null>;
-}
 
 export class NodeHttpAdapter implements IHttpAdapter {
   constructor(private readonly logger: Logger) {}

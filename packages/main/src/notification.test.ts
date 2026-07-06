@@ -4,6 +4,8 @@ import type { Logger } from 'pino';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { NotificationService } from './domains/notifications/NotificationService';
+import { NotificationTextFormatter } from './domains/notifications/NotificationTextFormatter';
+import { TemperatureEvaluator } from './domains/notifications/TemperatureEvaluator';
 import type { AgentData } from './domains/polling/AgentData';
 
 // Mock the notification dispatcher — the service depends on an interface, not electron directly
@@ -77,7 +79,7 @@ describe('NotificationService', () => {
 
   beforeEach(() => {
     resetMock();
-    service = new NotificationService(mockLogger, mockDispatcher);
+    service = new NotificationService(mockLogger, mockDispatcher, new TemperatureEvaluator(), new NotificationTextFormatter());
     settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as typeof DEFAULT_SETTINGS;
   });
 

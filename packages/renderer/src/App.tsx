@@ -9,6 +9,8 @@ import { GpuCard } from './components/GpuCard';
 import { GpuDetailModal } from './components/GpuDetailModal';
 import { DashboardService } from './domains/dashboard/DashboardService';
 import type { AgentState } from './types/AgentState';
+import { getAgentStatusLabel } from './utils/constants';
+import { useSettings } from './utils/useSettings';
 import { useWindowFocus } from './utils/useWindowFocus';
 import './styles/main.css';
 
@@ -16,28 +18,19 @@ import './styles/main.css';
 
 const dashboardService = new DashboardService();
 
-/** Rebuild AgentState from IPC payload. */
-function buildAgentState(payload: GpuDataPayload): AgentState {
-  const gpus = new Map<string, Array<import('@gpu-monitor/shared').IGpu>>();
-  for (const { agentId, gpus: gpuList } of payload.gpus) {
-    gpus.set(agentId, gpuList);
-  }
-
-  return {
-    agents: payload.agents,
-    gpus,
-    lastUpdate: new Map(payload.lastUpdate),
-    lastFetchTimestamp: new Map(payload.lastFetchTimestamp),
-    statusChangedAt: new Map(payload.statusChangedAt),
-    fetchResult: new Map(payload.fetchResult),
-  };
-}
-
 // ---------- App ----------
 
 export const App: React.FC = () => {
   const isFocused = useWindowFocus();
+  const [loadedSettings, _isSettingsLoading, _setLoadedSettings] = useSettings();
   const [settings, setSettings] = useState<ISettings>(DEFAULT_SETTINGS);
+
+  // Sync loaded settings into component state
+  useEffect(() => {
+    if (loadedSettings) {
+      setSettings(loadedSettings);
+    }
+  }, [loadedSettings]);
   const [agentState, setAgentState] = useState<AgentState>({
     agents: [],
     gpus: new Map(),
@@ -54,28 +47,22 @@ export const App: React.FC = () => {
   } | null>(null);
   const [showDebug, setShowDebug] = useState(false);
 
-  // Load settings from Electron API on mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        if (window.electronAPI) {
-          const result = await window.electronAPI.getSettings();
-          if (result.success && result.data) {
-            setSettings(result.data);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load settings:', err);
-      }
-    };
-    void loadSettings();
-  }, []);
-
   // Listen for GPU data updates from main process
   useEffect(() => {
     if (window.electronAPI?.onGpuDataUpdate) {
-      const cleanup = window.electronAPI.onGpuDataUpdate((payload) => {
-        setAgentState(buildAgentState(payload));
+      const cleanup = window.electronAPI.onGpuDataUpdate((payload: GpuDataPayload) => {
+        const gpus = new Map<string, Array<import('@gpu-monitor/shared').IGpu>>();
+        for (const { agentId, gpus: gpuList } of payload.gpus) {
+          gpus.set(agentId, gpuList);
+        }
+        setAgentState({
+          agents: payload.agents,
+          gpus,
+          lastUpdate: new Map(payload.lastUpdate),
+          lastFetchTimestamp: new Map(payload.lastFetchTimestamp),
+          statusChangedAt: new Map(payload.statusChangedAt),
+          fetchResult: new Map(payload.fetchResult),
+        });
       });
 
       return cleanup;
@@ -97,18 +84,9 @@ export const App: React.FC = () => {
   const gpusByAgent = dashboardService.getGpusByAgent(agentState);
   const unreachableAgents = dashboardService.getUnreachableAgents(agentState);
   const lastUpdate = dashboardService.getLastUpdateTime(agentState);
-  const _gpuCount = dashboardService.getGpuCount(agentState);
 
   // Driver version (all GPUs on one machine share the same driver)
-  const driverVersion = (() => {
-    for (const gpus of agentState.gpus.values()) {
-      if (gpus.length > 0 && gpus[0].driverVersion) {
-        return gpus[0].driverVersion;
-      }
-    }
-
-    return undefined;
-  })();
+  const driverVersion = dashboardService.getDriverVersion(agentState);
 
   return (
     <div className={`app${!isFocused ? ' unfocused' : ''}`}>
@@ -225,7 +203,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, ag
       <h3>{gpuData[0].agentName}</h3>
       <span className="agent-endpoint">{agent?.url || ''}</span>
       <span className={`agent-status-badge ${agent?.status || ''}`}>
-        {getAgentStatusBadge(agent?.status)}
+        {getAgentStatusLabel(agent?.status)}
       </span>
     </div>
     <div className="gpu-grid">
@@ -255,7 +233,7 @@ export const UnreachableAgent: React.FC<UnreachableAgentProps> = ({ agent }) => 
       <h3>{agent.name}</h3>
       <span className="agent-endpoint">{agent.url}</span>
       <span className={`agent-status-badge ${agent.status}`}>
-        {getAgentStatusBadge(agent.status)}
+        {getAgentStatusLabel(agent.status)}
       </span>
     </div>
     {agent.lastError && (
@@ -267,17 +245,3 @@ export const UnreachableAgent: React.FC<UnreachableAgentProps> = ({ agent }) => 
   </div>
 );
 
-function getAgentStatusBadge(status?: EAgentStatus): string {
-  switch (status) {
-    case EAgentStatus.Pending:
-      return 'Pending';
-    case EAgentStatus.Online:
-      return 'Online';
-    case EAgentStatus.Offline:
-      return 'Offline';
-    case EAgentStatus.Stale:
-      return 'Stale';
-    default:
-      return 'Unknown';
-  }
-}

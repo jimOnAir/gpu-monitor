@@ -1,4 +1,5 @@
 import type { EAgentStatus } from '../enums/EAgentStatus';
+
 import type { IAgent } from './IAgent';
 import type { IGpu } from './IGpu';
 

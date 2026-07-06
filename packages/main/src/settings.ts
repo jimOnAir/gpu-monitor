@@ -52,8 +52,8 @@ export const settingsSchema = z.object({
 });
 
 export type SettingsLogger = {
-  warn: (message: string, ...args: unknown[]) => void;
-  error: (message: string, ...args: unknown[]) => void;
+  warn: (message: string, ...args: unknown[]) => void,
+  error: (message: string, ...args: unknown[]) => void,
 };
 
 /** Validate and parse settings. Returns parsed object or null on failure. */

@@ -6,7 +6,6 @@
 
 import { EIPC } from '../enums/EIPC';
 
-import type { FetchResult } from './AgentData';
 import type { GpuDataPayload } from './IElectronAPI';
 import type { ISettings } from './ISettings';
 
@@ -79,24 +78,4 @@ export const IpcInvokeChannels: { [K in keyof IpcInvokeMap]: string } = {
   onWindowClose: EIPC.WINDOW_CLOSE,
   onClosePreferences: EIPC.CLOSE_PREFERENCES,
   openPreferences: EIPC.OPEN_PREFERENCES,
-};
-
-// ---------- Reverse maps: EIPC → callback type ----------
-
-/** Maps EIPC enum values to their callback types for typedOn. */
-export type EIPCCallbackMap = {
-  [EIPC.GPU_DATA_UPDATE]: (data: GpuDataPayload) => void,
-  [EIPC.OPEN_PREFERENCES]: () => void,
-  [EIPC.UPDATE_AVAILABLE]: (info: UpdateAvailableInfo) => void,
-  [EIPC.UPDATE_DOWNLOADED]: (info: UpdateDownloadedInfo) => void,
-  [EIPC.WINDOW_FOCUS]: () => void,
-  [EIPC.WINDOW_BLUR]: () => void,
-};
-
-/** Maps EIPC enum values to their invoke return types. */
-export type EIPCReturnMap = {
-  [EIPC.GET_SETTINGS]: IpcResult<ISettings | null>,
-  [EIPC.SAVE_SETTINGS]: IpcResult<boolean>,
-  [EIPC.WINDOW_CLOSE]: IpcResult<void>,
-  [EIPC.OPEN_PREFERENCES]: IpcResult<void>,
 };

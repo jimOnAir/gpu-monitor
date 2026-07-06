@@ -3,8 +3,29 @@
  * Centralizes values that are used across multiple components.
  */
 
+import { EAgentStatus } from '@gpu-monitor/shared';
+
 /** Bytes in one gibibyte (1024^3). */
 export const GB = 1024 * 1024 * 1024;
+
+/**
+ * Map EAgentStatus to its display label.
+ * Centralized so all components use the same labels.
+ */
+export function getAgentStatusLabel(status?: EAgentStatus): string {
+  switch (status) {
+    case EAgentStatus.Pending:
+      return 'Pending';
+    case EAgentStatus.Online:
+      return 'Online';
+    case EAgentStatus.Offline:
+      return 'Offline';
+    case EAgentStatus.Stale:
+      return 'Stale';
+    default:
+      return 'Unknown';
+  }
+}
 
 /** Threshold ratios for memory utilization status. */
 const MEMORY_THRESHOLDS = {

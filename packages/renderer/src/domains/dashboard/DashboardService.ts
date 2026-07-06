@@ -40,18 +40,6 @@ export class DashboardService {
   }
 
   /**
-   * Get total GPU count across all agents.
-   */
-  getGpuCount(state: AgentState): number {
-    let count = 0;
-    state.gpus.forEach((gpus) => {
-      count += gpus.length;
-    });
-
-    return count;
-  }
-
-  /**
    * Get the most recent update time across all agents.
    */
   getLastUpdateTime(state: AgentState): number {
@@ -63,5 +51,19 @@ export class DashboardService {
     });
 
     return latest;
+  }
+
+  /**
+   * Get the first non-undefined driver version across all agents.
+   * All GPUs on one machine share the same driver.
+   */
+  getDriverVersion(state: AgentState): string | undefined {
+    for (const gpus of state.gpus.values()) {
+      if (gpus.length > 0 && gpus[0].driverVersion) {
+        return gpus[0].driverVersion;
+      }
+    }
+
+    return undefined;
   }
 }

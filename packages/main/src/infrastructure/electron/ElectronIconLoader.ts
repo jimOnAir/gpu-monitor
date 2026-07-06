@@ -18,7 +18,7 @@ export class ElectronIconLoader implements IIconLoader {
     return img;
   }
 
-  loadBuildIcon(): NativeImage {
+  loadBuildIcon(resize = false): NativeImage {
     let iconPath: string;
     if (app.isPackaged) {
       iconPath = path.join(__dirname, '../../../..', 'build', 'icons', 'icon.png');
@@ -29,9 +29,10 @@ export class ElectronIconLoader implements IIconLoader {
     const img = nativeImage.createFromPath(iconPath);
     if (img.isEmpty()) {
       this.logger.warn({ iconPath }, 'Build icon not found, using default tray icon');
+
       return nativeImage.createEmpty();
     }
 
-    return img.resize({ width: 24, height: 24 });
+    return resize ? img.resize({ width: 24, height: 24 }) : img;
   }
 }

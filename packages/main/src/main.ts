@@ -2,6 +2,7 @@ import { app } from 'electron';
 
 import { AppBootstrap } from './infrastructure/bootstrap/AppBootstrap';
 import { ElectronAdapter } from './infrastructure/electron/ElectronAdapter';
+import { ElectronCrashRecoveryService } from './infrastructure/electron/ElectronCrashRecoveryService';
 import { ElectronExternalOpener } from './infrastructure/electron/ElectronExternalOpener';
 import { ElectronIconLoader } from './infrastructure/electron/ElectronIconLoader';
 import { ElectronMenuFactory } from './infrastructure/electron/ElectronMenuFactory';
@@ -9,6 +10,7 @@ import { ElectronNotificationDispatcher } from './infrastructure/electron/Electr
 import { ElectronThemeListener } from './infrastructure/electron/ElectronThemeListener';
 import { ElectronTrayFactory } from './infrastructure/electron/ElectronTrayFactory';
 import { ElectronWindowFactory } from './infrastructure/electron/ElectronWindowFactory';
+import { NodeFileStorage } from './infrastructure/electron/NodeFileStorage';
 import { NodeHttpAdapter } from './infrastructure/electron/NodeHttpAdapter';
 import logger from './logger';
 
@@ -26,6 +28,8 @@ app.whenReady().then(() => {
     new ElectronThemeListener(),
     new ElectronExternalOpener(),
     new ElectronMenuFactory(),
+    new ElectronCrashRecoveryService(app, new NodeFileStorage()),
+    new NodeFileStorage(),
   );
   const bootstrap = new AppBootstrap(logger, adapter);
   bootstrap.initialize();

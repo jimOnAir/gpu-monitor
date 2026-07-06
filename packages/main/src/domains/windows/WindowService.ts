@@ -10,7 +10,7 @@ import type { IThemeListener, ThemeColor } from './IThemeListener';
 import type { IWindowFactory } from './IWindowFactory';
 import type { IWindowService } from './IWindowService';
 import type { IWindowStatePersister } from './IWindowStatePersister';
-import { NavigationSecurityService } from './NavigationSecurityService';
+import type { NavigationSecurityService } from './NavigationSecurityService';
 
 export type BuildIconFn = () => Electron.NativeImage;
 
@@ -18,7 +18,7 @@ export class WindowService implements IWindowService {
   private mainWindow: BrowserWindow | null = null;
   private preferencesWindow: BrowserWindow | null = null;
   private currentPersister: IWindowStatePersister | null = null;
-  private currentPersisterSave: ((window: import('electron').BrowserWindow) => void) | null = null;
+  private currentPersisterSave: ((window: BrowserWindow) => void) | null = null;
   private willQuit = false;
 
   constructor(
@@ -29,6 +29,7 @@ export class WindowService implements IWindowService {
     private readonly themeListener: IThemeListener,
     private readonly mainWindowStatePersister: IWindowStatePersister,
     private readonly preferencesWindowStatePersister: IWindowStatePersister,
+    private readonly projectRoot: string,
   ) {}
 
   createMainWindow(settings: ISettings, _tray: Electron.Tray | null): void {
@@ -48,8 +49,7 @@ export class WindowService implements IWindowService {
     this.mainWindowStatePersister.save(this.mainWindow);
     this.currentPersisterSave = this.mainWindowStatePersister.save.bind(this.mainWindowStatePersister);
 
-    const projectRoot = path.resolve(__dirname, '../../../../');
-    this.mainWindow.loadFile(path.join(projectRoot, 'packages/renderer/dist/index.html'));
+    this.mainWindow.loadFile(path.join(this.projectRoot, 'packages/renderer/dist/index.html'));
 
     const trustedOrigins = this.buildTrustedOrigins(settings);
     this.mainWindow.webContents.on('will-navigate', (event, url) => {
@@ -98,8 +98,7 @@ export class WindowService implements IWindowService {
     this.preferencesWindowStatePersister.save(this.preferencesWindow);
     this.currentPersisterSave = this.preferencesWindowStatePersister.save.bind(this.preferencesWindowStatePersister);
 
-    const projectRoot = path.resolve(__dirname, '../../../../');
-    this.preferencesWindow.loadFile(path.join(projectRoot, 'packages/renderer/dist/settings.html'));
+    this.preferencesWindow.loadFile(path.join(this.projectRoot, 'packages/renderer/dist/settings.html'));
 
     this.setupWindowEvents(this.preferencesWindow, () => {
       this.preferencesWindow = null;
@@ -127,10 +126,6 @@ export class WindowService implements IWindowService {
 
   getPreferencesWindow(): BrowserWindow | null {
     return this.preferencesWindow;
-  }
-
-  setMainWindow(win: BrowserWindow | null): void {
-    this.mainWindow = win;
   }
 
   setPreferencesWindow(win: BrowserWindow | null): void {

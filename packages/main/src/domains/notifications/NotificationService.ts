@@ -5,8 +5,9 @@ import type { Logger } from '../../logger';
 
 import type { INotificationDispatcher } from './INotificationDispatcher';
 import type { INotificationService } from './INotificationService';
-import { NotificationTextFormatter, type NotificationType, TYPE_TO_COOLDOWN_KEY } from './NotificationTextFormatter';
-import { TemperatureEvaluator } from './TemperatureEvaluator';
+import type { NotificationTextFormatter } from './NotificationTextFormatter';
+import { type NotificationType, TYPE_TO_COOLDOWN_KEY } from './NotificationTextFormatter';
+import type { TemperatureEvaluator } from './TemperatureEvaluator';
 
 /**
  * Evaluates GPU temperature and agent status against configured thresholds,
@@ -20,8 +21,8 @@ export class NotificationService implements INotificationService {
   constructor(
     private readonly logger: Logger,
     private readonly notificationDispatcher: INotificationDispatcher,
-    private readonly temperatureEvaluator = new TemperatureEvaluator(),
-    private readonly textFormatter = new NotificationTextFormatter(),
+    private readonly temperatureEvaluator: TemperatureEvaluator,
+    private readonly textFormatter: NotificationTextFormatter,
   ) {}
 
   evaluateAndNotify(data: AgentData, settings: ISettings): void {
@@ -166,9 +167,8 @@ export class NotificationService implements INotificationService {
 
     const title = this.textFormatter.buildNotificationTitle(type, agentName, metric);
     const body = this.textFormatter.buildNotificationBody(type, agentName, metric);
-    const iconPath = `../../assets/${icon}`;
 
-    this.notificationDispatcher.show({ title, body, icon: iconPath, silent: false });
+    this.notificationDispatcher.show({ title, body, icon, silent: false });
     this.logger.info({ type, agentId, metric, value }, `Notification fired: ${title}`);
   }
 }

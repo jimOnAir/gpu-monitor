@@ -3,27 +3,28 @@ import type { AgentData } from '@gpu-monitor/shared';
 import type { BrowserWindow } from 'electron';
 import { app } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import * as fs from 'fs';
 import * as path from 'path';
 
+import type { ICrashRecoveryService } from '../../domains/ICrashRecoveryService';
 import type { INotificationService } from '../../domains/notifications/INotificationService';
 import { NotificationService } from '../../domains/notifications/NotificationService';
-import { PollingService } from '../../domains/polling/PollingService';
+import { NotificationTextFormatter } from '../../domains/notifications/NotificationTextFormatter';
+import { TemperatureEvaluator } from '../../domains/notifications/TemperatureEvaluator';
+import { AgentPoller } from '../../domains/polling/AgentPoller';
 import type { IPollingService } from '../../domains/polling/IPollingService';
-import { SettingsRepository } from '../../domains/settings/SettingsRepository';
+import { PollingService } from '../../domains/polling/PollingService';
+import { StaleDetector } from '../../domains/polling/StaleDetector';
 import type { ISettingsRepository } from '../../domains/settings/ISettingsService';
+import { SettingsRepository } from '../../domains/settings/SettingsRepository';
 import type { ITrayService } from '../../domains/tray/ITrayService';
 import { TrayService } from '../../domains/tray/TrayService';
 import type { IWindowService } from '../../domains/windows/IWindowService';
-import { WindowService } from '../../domains/windows/WindowService';
 import { NavigationSecurityService } from '../../domains/windows/NavigationSecurityService';
+import { WindowService } from '../../domains/windows/WindowService';
 import { IpcHandler } from '../../IpcHandler';
 import type { Logger } from '../../logger';
 import { MenuService } from '../../MenuService';
 import type { ElectronAdapter } from '../electron/ElectronAdapter';
-
-const MAX_CRASH_COUNT = 3;
-const CRASH_WINDOW_MS = 30 * 60 * 1000;
 
 export class AppBootstrap {
   private settingsRepository!: ISettingsRepository;
@@ -32,6 +33,7 @@ export class AppBootstrap {
   private windowService!: IWindowService;
   private pollingService!: IPollingService;
   private menuService!: MenuService;
+  private _crashRecovery!: ICrashRecoveryService;
 
   constructor(
     private readonly logger: Logger,
@@ -43,19 +45,21 @@ export class AppBootstrap {
 
     const settings = this.settingsRepository.load();
 
-    const isCrashLoop = this.recordCrash();
+    const isCrashLoop = this._crashRecovery.recordCrash();
     if (isCrashLoop) {
       void this.showRecoveryDialog();
+
       return;
     }
-    this.recordStartup();
+    this._crashRecovery.recordStartup();
 
     this.setupUx(settings);
     this.setupLifecycle();
   }
 
   private wireServices(): void {
-    this.settingsRepository = new SettingsRepository(this.logger, this.electronAdapter.appPath);
+    const crashRecovery = this.electronAdapter.crashRecovery;
+    this.settingsRepository = new SettingsRepository(this.logger, this.electronAdapter.appPath, this.electronAdapter.fileStorage);
 
     this.trayService = new TrayService(
       this.logger,
@@ -71,10 +75,18 @@ export class AppBootstrap {
       this.electronAdapter.themeListener,
       this.electronAdapter.createWindowStatePersister({ file: 'main-window-state.json', defaultWidth: 720, defaultHeight: 800 }),
       this.electronAdapter.createWindowStatePersister({ file: 'preferences-window-state.json', defaultWidth: 600, defaultHeight: 500 }),
+      this.electronAdapter.projectRoot,
     );
 
-    this.notificationService = new NotificationService(this.logger, this.electronAdapter.notificationDispatcher);
+    this.notificationService = new NotificationService(
+      this.logger,
+      this.electronAdapter.notificationDispatcher,
+      new TemperatureEvaluator(),
+      new NotificationTextFormatter(),
+    );
 
+    const agentPoller = new AgentPoller(this.logger, this.electronAdapter.http);
+    const staleDetector = new StaleDetector();
     this.pollingService = new PollingService(
       this.logger,
       this.electronAdapter.http,
@@ -82,6 +94,8 @@ export class AppBootstrap {
       this.notificationService,
       this.trayService,
       this.windowService,
+      agentPoller,
+      staleDetector,
     );
 
     const ipcHandler = new IpcHandler(
@@ -94,6 +108,8 @@ export class AppBootstrap {
 
     this.menuService = new MenuService(this.windowService, this.electronAdapter.menuFactory);
     this.menuService.register();
+
+    this._crashRecovery = crashRecovery;
   }
 
   private setupUx(settings: ISettings): void {
@@ -223,41 +239,13 @@ export class AppBootstrap {
     });
   }
 
-  private recordCrash(): boolean {
-    const crashLogFile = path.join(app.getPath('userData'), 'crash-log.json');
-    try {
-      let crashes: Array<{ timestamp: number }> = [];
-      if (fs.existsSync(crashLogFile)) {
-        const raw = fs.readFileSync(crashLogFile, 'utf-8');
-        const parsed = JSON.parse(raw) as { crashes?: Array<{ timestamp: number }> };
-        crashes = parsed.crashes || [];
-      }
-      const now = Date.now();
-      crashes = crashes.filter((c) => now - c.timestamp < CRASH_WINDOW_MS);
-      crashes.push({ timestamp: now });
-      fs.writeFileSync(crashLogFile, JSON.stringify({ crashes }, null, 2), { mode: 0o600 });
-
-      return crashes.length >= MAX_CRASH_COUNT;
-    } catch {
-      return false;
-    }
-  }
-
-  private recordStartup(): void {
-    const crashLogFile = path.join(app.getPath('userData'), 'crash-log.json');
-    try {
-      fs.writeFileSync(crashLogFile, JSON.stringify({ crashes: [] }, null, 2), { mode: 0o600 });
-    } catch {
-      // Silently ignore
-    }
-  }
-
   private async showRecoveryDialog(): Promise<void> {
     this.logger.warn('Crash loop detected — showing recovery dialog');
     const mainWindow = this.windowService.getMainWindow();
     if (!mainWindow) {
       this.logger.error('Main window not available for recovery dialog');
       app.quit();
+
       return;
     }
 
@@ -274,13 +262,12 @@ export class AppBootstrap {
 
     if (result.response === 0) {
       try {
-        const settingsFile = path.join(app.getPath('userData'), 'settings', 'settings.json');
-        if (fs.existsSync(settingsFile)) {
+        const settingsFile = path.join(this._crashRecovery.getUserDataPath(), 'settings', 'settings.json');
+        if (this.electronAdapter.fileStorage.existsSync(settingsFile)) {
           const backupPath = settingsFile + '.backup.' + String(Date.now());
-          fs.renameSync(settingsFile, backupPath);
+          this.electronAdapter.fileStorage.renameSync(settingsFile, backupPath);
         }
-        const crashLogFile = path.join(app.getPath('userData'), 'crash-log.json');
-        fs.writeFileSync(crashLogFile, JSON.stringify({ crashes: [] }, null, 2), { mode: 0o600 });
+        this._crashRecovery.recordStartup();
         this.pollingService.stopPolling();
         app.relaunch();
         app.exit(0);

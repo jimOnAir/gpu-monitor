@@ -1,6 +1,6 @@
+import type { FetchResult } from './AgentData';
 import type { IAgent } from './IAgent';
 import type { IGpu } from './IGpu';
-import type { FetchResult } from './AgentData';
 import type { IpcEventMap, IpcInvokeMap } from './IpcChannels';
 
 /**

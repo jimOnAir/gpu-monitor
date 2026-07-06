@@ -1,10 +1,10 @@
 import { DEFAULT_SETTINGS, type ISettings } from '@gpu-monitor/shared';
-import * as fs from 'fs';
 import * as path from 'path';
 
 import type { Logger } from '../../logger';
 import { parseSettings } from '../../settings';
 
+import type { IFileStorage } from './IFileStorage';
 import type { ISettingsRepository } from './ISettingsService';
 
 export class SettingsRepository implements ISettingsRepository {
@@ -13,17 +13,18 @@ export class SettingsRepository implements ISettingsRepository {
   constructor(
     private readonly logger: Logger,
     settingsDir: string,
+    private readonly fileStorage: IFileStorage,
   ) {
     this.settingsFile = path.join(settingsDir, 'settings.json');
-    if (!fs.existsSync(settingsDir)) {
-      fs.mkdirSync(settingsDir, { recursive: true });
+    if (!this.fileStorage.existsSync(settingsDir)) {
+      this.fileStorage.mkdirSync(settingsDir, { recursive: true });
     }
   }
 
   load(): ISettings {
     try {
-      if (fs.existsSync(this.settingsFile)) {
-        const raw = fs.readFileSync(this.settingsFile, 'utf-8');
+      if (this.fileStorage.existsSync(this.settingsFile)) {
+        const raw = this.fileStorage.readFileSync(this.settingsFile, 'utf-8');
         const parsed = JSON.parse(raw) as unknown;
         const validated = parseSettings(parsed, this.logger);
         if (validated) {
@@ -46,7 +47,7 @@ export class SettingsRepository implements ISettingsRepository {
       return false;
     }
     try {
-      fs.writeFileSync(this.settingsFile, JSON.stringify(validated, null, 2), { mode: 0o600, encoding: 'utf-8' });
+      this.fileStorage.writeFileSync(this.settingsFile, JSON.stringify(validated, null, 2), { mode: 0o600, encoding: 'utf-8' });
 
       return true;
     } catch (err) {

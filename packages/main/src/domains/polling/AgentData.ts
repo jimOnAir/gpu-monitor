@@ -1,6 +1,6 @@
-import type { AgentData, FetchResult } from '@gpu-monitor/shared';
+import type { AgentData, ISettings } from '@gpu-monitor/shared';
 
-export type { AgentData, FetchResult };
+export type { AgentData };
 
 /**
  * Callback handlers registered by the composition root.
@@ -8,6 +8,6 @@ export type { AgentData, FetchResult };
  */
 export interface PollingHandlers {
   pushToRenderer: () => void;
-  evaluateAndNotify: (agentData: AgentData, settings: import('@gpu-monitor/shared').ISettings) => void;
+  evaluateAndNotify: (agentData: AgentData, settings: ISettings) => void;
   updateTrayFromData: () => void;
 }

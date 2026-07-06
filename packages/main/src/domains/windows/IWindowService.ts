@@ -8,7 +8,6 @@ export interface IWindowService {
   createPreferencesWindow: (parent: BrowserWindow | null) => void;
   getMainWindow: () => BrowserWindow | null;
   getPreferencesWindow: () => BrowserWindow | null;
-  setMainWindow: (win: BrowserWindow | null) => void;
   setPreferencesWindow: (win: BrowserWindow | null) => void;
   setWillQuit: (value: boolean) => void;
   buildTrustedOrigins: (settings: ISettings) => Set<string>;
