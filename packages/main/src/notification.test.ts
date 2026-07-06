@@ -1,40 +1,35 @@
 import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
 import type { IAgent, IGpu, INotificationCooldowns } from '@gpu-monitor/shared';
+import type { Logger } from 'pino';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import type { AgentData } from './notification-service';
-import { NotificationService } from './notification-service';
+import { NotificationService } from './domains/notifications/NotificationService';
+import type { AgentData } from './domains/polling/AgentData';
 
-// Mock Electron — only Notification is needed; everything else is no-op stubs
+// Mock the notification dispatcher — the service depends on an interface, not electron directly
 const mockNotifications: Array<{ title: string, body: string, icon: string, silent: boolean }> = [];
-vi.mock('electron', () => ({
-  Notification: vi.fn().mockImplementation((props: Record<string, unknown>) => {
-    mockNotifications.push(props as unknown as typeof mockNotifications[0]);
+const mockLogger = {
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  setEnvironment: vi.fn(),
+  setLevel: vi.fn(),
+  child: vi.fn().mockReturnThis(),
+  trace: vi.fn(),
+  fatal: vi.fn(),
+} as unknown as Logger;
 
-    return { show: vi.fn() };
-  }),
-  app: {
-    getPath: vi.fn().mockReturnValue('/tmp'),
-    getName: vi.fn(),
-    setName: vi.fn(),
-    isPackaged: false,
-    requestSingleInstanceLock: vi.fn().mockReturnValue(true),
-    whenReady: vi.fn().mockResolvedValue(undefined),
-    on: vi.fn(),
-    quit: vi.fn(),
+const mockDispatcher = {
+  show: (props: { title: string, body: string, icon?: string, silent: boolean }) => {
+    mockNotifications.push({
+      title: props.title,
+      body: props.body,
+      icon: props.icon ?? '',
+      silent: props.silent,
+    });
   },
-  BrowserWindow: vi.fn(),
-  Tray: vi.fn(),
-  Menu: {
-    buildFromTemplate: vi.fn().mockReturnValue({}),
-    setApplicationMenu: vi.fn(),
-  },
-  nativeImage: { createFromPath: vi.fn(), createEmpty: vi.fn() },
-  ipcMain: {
-    on: vi.fn(),
-    handle: vi.fn(),
-  },
-}));
+};
 
 function buildAgent(id = 'test', status: EAgentStatus = EAgentStatus.Online): IAgent {
   return { id, name: id, url: 'http://localhost:9091', status };
@@ -67,6 +62,7 @@ function buildData(agents: IAgent[] = [buildAgent()], gpus = new Map<string, IGp
     lastFetchTimestamp: new Map(),
     statusChangedAt: new Map(),
     fetchResult: new Map(),
+    prevAgentStatus: new Map(),
   };
 }
 
@@ -81,7 +77,7 @@ describe('NotificationService', () => {
 
   beforeEach(() => {
     resetMock();
-    service = new NotificationService();
+    service = new NotificationService(mockLogger, mockDispatcher);
     settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as typeof DEFAULT_SETTINGS;
   });
 

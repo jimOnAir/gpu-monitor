@@ -5,4 +5,5 @@ const logger = pino({
   name: 'gpu-monitor-main',
 });
 
+export type Logger = typeof logger;
 export default logger;

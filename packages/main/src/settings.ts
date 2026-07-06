@@ -2,7 +2,6 @@ import { EAgentStatus } from '@gpu-monitor/shared';
 import { z } from 'zod';
 
 import logger from './logger';
-import type { Settings } from './notification-service';
 
 const tempThresholdSchema = z.object({
   warn: z.number(),
@@ -55,7 +54,7 @@ export const settingsSchema = z.object({
 });
 
 /** Validate and parse settings. Returns parsed object or null on failure. */
-export function parseSettings(data: unknown): Settings | null {
+export function parseSettings(data: unknown): z.infer<typeof settingsSchema> | null {
   const result = settingsSchema.safeParse(data);
   if (!result.success) {
     logger.warn({ errors: result.error.format() }, 'Settings validation failed');

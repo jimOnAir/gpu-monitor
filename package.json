@@ -18,6 +18,7 @@
     "start:main": "npm run start -w @gpu-monitor/main",
     "start:render": "npm run start -w @gpu-monitor/renderer",
     "lint": "npm run lint -w @gpu-monitor/main && npm run lint -w @gpu-monitor/renderer && npm run lint -w @gpu-monitor/shared",
+    "lint:fix": "npm run lint:fix -w @gpu-monitor/main && npm run lint:fix -w @gpu-monitor/renderer && npm run lint:fix -w @gpu-monitor/shared",
     "package": "npm run build && electron-builder --linux AppImage",
     "package:linux": "npm run build && electron-builder --linux AppImage",
     "clean": "rimraf node_modules packages/*/node_modules release",

@@ -1,8 +1,11 @@
-import type { AgentData, Settings } from '../notifications/INotificationService';
+import type { ISettings } from '@gpu-monitor/shared';
+
+import type { AgentData, PollingHandlers } from './AgentData';
 
 export interface IPollingService {
-  startPolling: (settings: Settings) => void;
+  startPolling: (settings: ISettings) => void;
   stopPolling: () => void;
   refreshAllAgents: () => Promise<void>;
   getAgentData: () => AgentData;
+  registerHandlers: (handlers: PollingHandlers) => void;
 }

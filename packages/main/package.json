@@ -6,6 +6,7 @@
     "build": "node scripts/build-esbuild.js",
     "start": "electron .",
     "lint": "eslint src/",
+    "lint:fix": "eslint --fix src/",
     "test": "vitest run",
     "install:desktop": "bash scripts/install-desktop-entry.sh"
   },

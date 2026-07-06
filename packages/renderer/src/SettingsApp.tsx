@@ -46,7 +46,7 @@ export const SettingsApp: React.FC = () => {
           setSaveSuccess(true);
           // Close the preferences window after successful save
           setTimeout(() => {
-            void window.electronAPI?.onWindowClose();
+            void window.electronAPI?.onClosePreferences();
           }, 1000);
         } else {
           setError(result.error || 'Failed to save settings');

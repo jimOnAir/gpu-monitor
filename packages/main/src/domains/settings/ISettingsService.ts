@@ -1,11 +1,11 @@
-import type { Settings } from '../notifications/INotificationService';
+import type { ISettings } from '@gpu-monitor/shared';
 
 export interface ISettingsRepository {
-  load: () => Settings | null;
-  save: (settings: Settings) => boolean;
+  load: () => ISettings;
+  save: (settings: ISettings) => boolean;
 }
 
 export interface ISettingsService {
-  load: () => Settings;
+  load: () => ISettings;
   save: (settings: unknown) => boolean;
 }

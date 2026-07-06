@@ -6,6 +6,7 @@
     "build": "webpack --mode production",
     "start": "webpack serve --mode development",
     "lint": "eslint src/",
+    "lint:fix": "eslint --fix src/",
     "test": "vitest run",
     "test:watch": "vitest"
   },
