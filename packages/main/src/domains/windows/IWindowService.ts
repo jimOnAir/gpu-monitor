@@ -6,6 +6,7 @@ import type { AgentData } from '../polling/AgentData';
 export interface IWindowService {
   createMainWindow: (settings: ISettings, tray: Tray | null) => void;
   createPreferencesWindow: (parent: BrowserWindow | null) => void;
+  togglePreferencesWindow: () => void;
   getMainWindow: () => BrowserWindow | null;
   getPreferencesWindow: () => BrowserWindow | null;
   setPreferencesWindow: (win: BrowserWindow | null) => void;

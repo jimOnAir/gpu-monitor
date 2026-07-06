@@ -43,7 +43,7 @@ export class IpcHandler {
 
     ipcMain.handle(EIPC.OPEN_PREFERENCES, (): IpcResult<void> => {
       this.logger.info('IPC open-preferences');
-      this.windowService.createPreferencesWindow(this.windowService.getMainWindow());
+      this.windowService.togglePreferencesWindow();
 
       return { success: true, data: undefined };
     });

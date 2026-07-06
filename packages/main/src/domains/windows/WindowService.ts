@@ -69,6 +69,21 @@ export class WindowService implements IWindowService {
     });
   }
 
+  togglePreferencesWindow(): void {
+    if (this.preferencesWindow) {
+      if (this.preferencesWindow.isVisible()) {
+        this.preferencesWindow.hide();
+      } else {
+        this.preferencesWindow.show();
+        this.preferencesWindow.focus();
+      }
+
+      return;
+    }
+
+    this.createPreferencesWindow(this.mainWindow);
+  }
+
   createPreferencesWindow(parent: BrowserWindow | null): void {
     if (this.preferencesWindow) {
       if (this.preferencesWindow.isVisible()) {

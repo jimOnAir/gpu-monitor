@@ -209,7 +209,7 @@ export class AppBootstrap {
   }
 
   private openPreferences(): void {
-    this.windowService.createPreferencesWindow(this.windowService.getMainWindow());
+    this.windowService.togglePreferencesWindow();
   }
 
   private initializeAutoUpdater(mainWindow: BrowserWindow | null): void {
