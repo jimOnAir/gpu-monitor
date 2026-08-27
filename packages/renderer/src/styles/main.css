@@ -40,7 +40,7 @@
   /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
-  --spacing-md: 12px;
+  --spacing-md: 10px;
   --spacing-lg: 16px;
   --spacing-xl: 20px;
 
@@ -50,8 +50,8 @@
   --radius-lg: 8px;
 
   /* Card */
-  --card-padding: 14px;
-  --card-gap: 10px;
+  --card-padding: 10px;
+  --card-gap: 8px;
 }
 
 /* Reset */
@@ -191,19 +191,19 @@ body.settings-body {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--spacing-lg);
+  padding: 12px;
 }
 
 /* Agent Section */
 .agent-section {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: 10px;
 }
 
 .agent-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: 8px;
 }
 
 .agent-section-header h3 {
@@ -356,7 +356,7 @@ body.settings-body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: 8px;
   padding-bottom: var(--spacing-sm);
   border-bottom: 1px solid var(--border);
 }
@@ -399,8 +399,8 @@ body.settings-body {
 .gpu-card-section {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-md);
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 /* GpuRow */
@@ -420,7 +420,7 @@ body.settings-body {
 
 .gpu-row-bar {
   flex: 1;
-  height: 20px;
+  height: 16px;
 }
 
 .gpu-row-value {
@@ -436,7 +436,7 @@ body.settings-body {
 .gpu-bar-container {
   position: relative;
   width: 100%;
-  height: 20px;
+  height: 16px;
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
@@ -485,7 +485,7 @@ body.settings-body {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  margin: var(--spacing-md) 0;
+  margin: 8px 0;
   color: var(--text-muted);
   font-size: var(--font-size-small);
 }
@@ -1309,7 +1309,7 @@ body.settings-body {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
+  padding: 12px;
   margin-bottom: var(--spacing-lg);
 }
 
@@ -1396,7 +1396,7 @@ body.settings-body {
 
 /* Sections */
 .detail-section {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: 10px;
 }
 
 .detail-section:last-child {
@@ -1409,7 +1409,7 @@ body.settings-body {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: 8px;
   padding-bottom: var(--spacing-xs);
   border-bottom: 1px solid var(--border);
 }
@@ -1516,7 +1516,7 @@ body.settings-body {
 
 .detail-temp-bar-wrap {
   flex: 1;
-  height: 20px;
+  height: 16px;
 }
 
 .detail-temp-value {

@@ -73,7 +73,7 @@ export class AppBootstrap {
       () => this.electronAdapter.buildTrayIcon(),
       new NavigationSecurityService(this.electronAdapter.externalOpener),
       this.electronAdapter.themeListener,
-      this.electronAdapter.createWindowStatePersister({ file: 'main-window-state.json', defaultWidth: 720, defaultHeight: 800 }),
+      this.electronAdapter.createWindowStatePersister({ file: 'main-window-state.json', defaultWidth: 720, defaultHeight: 720 }),
       this.electronAdapter.createWindowStatePersister({ file: 'preferences-window-state.json', defaultWidth: 600, defaultHeight: 500 }),
       this.electronAdapter.projectRoot,
     );
