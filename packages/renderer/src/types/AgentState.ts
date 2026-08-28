@@ -1,17 +1,9 @@
 /**
- * Renderer-side AgentState is an alias for the shared AgentData type.
- * This eliminates type duplication between main and renderer packages.
+ * Renderer-side view of the shared AgentData.
+ * Derived from AgentData — prevAgentStatus is main-process-only state.
  */
-import type { IAgent, IGpu } from '@gpu-monitor/shared';
-import type { FetchResult } from '@gpu-monitor/shared';
+import type { AgentData } from '@gpu-monitor/shared';
 
 export type { FetchResult } from '@gpu-monitor/shared';
 
-export interface AgentState {
-  agents: IAgent[];
-  gpus: Map<string, IGpu[]>;
-  lastUpdate: Map<string, number>;
-  lastFetchTimestamp: Map<string, number>;
-  statusChangedAt: Map<string, number>;
-  fetchResult: Map<string, FetchResult>;
-}
+export type AgentState = Omit<AgentData, 'prevAgentStatus'>;

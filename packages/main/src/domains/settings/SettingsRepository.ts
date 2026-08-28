@@ -39,6 +39,19 @@ export class SettingsRepository implements ISettingsRepository {
     return { ...DEFAULT_SETTINGS };
   }
 
+  backup(): void {
+    if (!this.fileStorage.existsSync(this.settingsFile)) {
+      return;
+    }
+    const backupPath = `${this.settingsFile}.backup.${String(Date.now())}`;
+    try {
+      this.fileStorage.renameSync(this.settingsFile, backupPath);
+      this.logger.info({ backupPath }, 'Settings backed up');
+    } catch (err) {
+      this.logger.error({ err: String(err) }, 'Failed to back up settings');
+    }
+  }
+
   save(settings: ISettings): boolean {
     const validated = parseSettings(settings);
     if (!validated) {

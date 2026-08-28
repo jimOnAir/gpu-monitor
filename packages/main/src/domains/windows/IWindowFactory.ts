@@ -1,4 +1,4 @@
-import type { BrowserWindow } from 'electron';
+import type { IWindowHandle } from './IWindowHandle';
 
 export interface IWindowFactory {
   create: (opts: {
@@ -8,12 +8,19 @@ export interface IWindowFactory {
     height?: number,
     minWidth?: number,
     minHeight?: number,
-    parent?: BrowserWindow,
+    parent?: IWindowHandle | null,
     backgroundColor?: string,
-    icon?: Electron.NativeImage,
+    icon?: unknown,
     hasShadow?: boolean,
     roundedCorners?: boolean,
     titleBarStyle?: 'hidden' | 'default',
     show?: boolean,
-  }) => BrowserWindow;
+    loadFile: string,
+    onReadyToShow: () => void,
+    onFocus: () => void,
+    onBlur: () => void,
+    onClose: (event: { preventDefault: () => void }) => void,
+    onWillNavigate: (event: { preventDefault: () => void }, url: string) => void,
+    onWindowOpen: (url: string) => 'allow' | 'deny',
+  }) => IWindowHandle;
 }

@@ -11,7 +11,7 @@ Service classes live in `domains/`, adapters in `infrastructure/electron/`, the 
 
 ```
 src/
-├── main.ts                              # ~12 lines: creates ElectronAdapter + AppBootstrap
+├── main.ts                              # creates adapters + AppBootstrap
 ├── logger.ts                            # Pino logger singleton
 ├── settings.ts                          # Zod schema + parseSettings (pure validation)
 ├── gpu-validation.ts                    # Zod schemas for agent responses (pure)
@@ -20,46 +20,65 @@ src/
 ├── preload.ts                           # contextBridge bridge
 │
 ├── domains/
+│   ├── ICrashRecoveryService.ts         # Crash-log interface (adapter: ElectronCrashRecoveryService)
+ │   ├── lifecycle/
+ │   │   ├── IAppLifecycle.ts             # Adapter interface (app events, quit/relaunch)
+ │   │   ├── IAutoUpdater.ts              # Adapter interface (electron-updater)
+ │   │   └── LifecycleService.ts          # second-instance, activate (ensureMainWindow), before-quit, updater events
+ │   ├── menu/
+ │   │   └── IMenuFactory.ts              # Adapter interface (no electron types)
 │   ├── notifications/
 │   │   ├── INotificationService.ts      # Interface
 │   │   ├── INotificationDispatcher.ts   # Adapter interface (no electron)
-│   │   └── NotificationService.ts       # Implementation — per-metric threshold evaluation, cooldowns
+│   │   └── NotificationService.ts       # Threshold eval + cooldowns + transitions (self-contained)
 │   ├── polling/
 │   │   ├── IPollingService.ts           # Interface
-│   │   ├── AgentData.ts                 # AgentData + PollingHandlers types
-│   │   └── PollingService.ts            # HTTP polling via IHttpAdapter
-│   ├── settings/
-│   │   ├── ISettingsService.ts          # Interface + ISettingsRepository
-│   │   └── SettingsService.ts           # Thin facade over repository
+│   │   ├── AgentData.ts                 # PollingHandlers type (AgentData from shared)
+│   │   ├── AgentPoller.ts               # HTTP fetch + classifyResult (pure classification)
+│   │   ├── PollingService.ts            # Owns active settings + the poll cycle (runCycle)
+│   │   └── StaleDetector.ts             # Stale detection (15s threshold)
+ │   ├── recovery/
+ │   │   ├── IDialogAdapter.ts            # Adapter interface (native message boxes)
+ │   │   └── RecoveryService.ts           # Crash-loop policy: dialog + settings backup (via ISettingsRepository)
+ │   ├── settings/
+ │   │   ├── ISettingsService.ts          # ISettingsRepository interface (load/save/backup)
+ │   │   ├── IFileStorage.ts              # Adapter interface (fs, no node types)
+ │   │   └── SettingsRepository.ts        # File IO + Zod validation + backup
 │   ├── tray/
-│   │   ├── ITrayService.ts              # Interface
-│   │   ├── ITrayFactory.ts              # Adapter interface (no electron)
+│   │   ├── ITrayService.ts              # Interface (no electron types)
+│   │   ├── ITrayHandle.ts               # Domain abstraction over the tray object
+│   │   ├── ITrayFactory.ts              # Adapter interface (no electron types)
 │   │   ├── IIconLoader.ts               # Adapter interface (no electron)
 │   │   └── TrayService.ts               # Tray icon/tooltip updates
-│   ├── windows/
-│   │   ├── IWindowService.ts            # Interface
-│   │   ├── IWindowFactory.ts            # Adapter interface (no electron)
-│   │   ├── IWindowStatePersister.ts     # Adapter interface (no electron)
-│   │   ├── IExternalOpener.ts           # Adapter interface (no electron)
-│   │   ├── IThemeListener.ts            # Adapter interface (no electron)
-│   │   └── WindowService.ts             # BrowserWindow creation + state management
+│   └── windows/
+│       ├── IWindowService.ts            # Interface (no electron types)
+│       ├── IWindowHandle.ts             # Domain abstraction over a window
+│       ├── IWindowFactory.ts            # Adapter interface (returns IWindowHandle)
+│       ├── IWindowStatePersister.ts     # Adapter interface (no electron types)
+│       ├── IExternalOpener.ts           # Adapter interface (no electron)
+│       ├── IThemeListener.ts            # Adapter interface (no electron)
+│       ├── NavigationSecurityService.ts # URL trust validation (pure)
+│       └── WindowService.ts             # Window lifecycle + state management
 │
 ├── infrastructure/
 │   ├── bootstrap/
-│   │   └── AppBootstrap.ts              # Composition root: instantiates + wires all services
+│   │   └── AppBootstrap.ts              # Composition root: wires services, no behavior
 │   └── electron/
-│       ├── ElectronAdapter.ts           # Single bridge: aggregates all adapter instances
-│       ├── ElectronNotificationDispatcher.ts
-│       ├── ElectronMenuFactory.ts
-│       ├── ElectronTrayFactory.ts
-│       ├── ElectronIconLoader.ts
-│       ├── ElectronWindowFactory.ts
-│       ├── ElectronWindowStatePersister.ts
+│       ├── ElectronAdapter.ts           # Adapter aggregate (appPath, projectRoot, persister factory)
+│       ├── ElectronAppLifecycle.ts      # app.on(second-instance/activate/before-quit)
+│       ├── ElectronAutoUpdater.ts       # electron-updater wrapper
+│       ├── ElectronCrashRecoveryService.ts
+│       ├── ElectronDialogAdapter.ts     # dialog.showMessageBox wrapper
 │       ├── ElectronExternalOpener.ts
+│       ├── ElectronIconLoader.ts
+│       ├── ElectronMenuFactory.ts
+│       ├── ElectronNotificationDispatcher.ts
 │       ├── ElectronThemeListener.ts
+│       ├── ElectronTrayFactory.ts       # Wraps Tray in ITrayHandle
+│       ├── ElectronWindowFactory.ts     # Wraps BrowserWindow in IWindowHandle
+│       ├── ElectronWindowStatePersister.ts
+│       ├── NodeFileStorage.ts
 │       └── NodeHttpAdapter.ts           # http.get wrapper
-│
-└── settings-persistence.ts              # DELETED — replaced by SettingsRepository
 ```
 
 ## Local Contracts
@@ -70,10 +89,12 @@ src/
 - Logger in `logger.ts` handles main-process logging
 - **Settings validation**: Zod schema in `settings.ts` — `parseSettings()` for runtime validation; agent URLs validated via `agentUrlSchema` (http/https only, rejects `file://`)
 - **GPU data validation**: Zod schemas in `gpu-validation.ts` — validates raw agent responses before processing (`validateGpuResponse()`)
-- **Agent polling**: `PollingService` uses `IHttpAdapter` (Node.js `http.get()`) to poll agent `/gpu` + `/health` endpoints, `Promise.allSettled` for parallel polling; raw responses validated through `classifyResult()` → `validateGpuResponse()` pipeline
-- **Stale detection**: runs every 5s, independent of polling interval
-- **NotificationService**: lives in `domains/notifications/NotificationService.ts` — evaluates per-GPU temperature thresholds (core/junction/vram with per-metric thresholds), manages per-trigger cooldowns, fires through `INotificationDispatcher` adapter
-- Tray icon and tooltip update are internal to main process (no IPC needed); tray uses per-metric evaluation (`getTempState()` + `worstState()`) so junction/vram critical temps override core-only normal state
+- **Agent polling**: `PollingService` owns the active settings and the poll cycle (`runCycle`: fetch → classify → stale → notify → tray → push). All entry points (poll interval, stale-check interval, `refreshAgents()`) run the same cycle. `AgentPoller` fetches `/gpu` + `/health` in parallel (timeout enforced by `IHttpAdapter`); `classifyResult()` → `validateGpuResponse()` pipeline classifies as `ok` / `fetch-failed` / `health-failed` / `invalid`
+- **Stale detection**: runs every 5s as part of the poll cycle, independent of the polling interval
+- **NotificationService**: self-contained (constructor: logger + dispatcher) — evaluates per-GPU temperature thresholds via shared `evaluateStatus()`, tracks per-metric previous state (`agentId:metric` keys), per-agent warned flags, and per-trigger cooldowns; fires through `INotificationDispatcher` adapter
+- **Threshold evaluation**: single source of truth is `evaluateStatus()` / `worstStatus()` in `@gpu-monitor/shared` — consumed by tray, notifications, and renderer. One label vocabulary: `normal | warning | danger`
+- Tray icon and tooltip update are internal to main process (no IPC needed); tray uses per-metric evaluation via shared `evaluateStatus()` so junction/vram critical temps override core-only normal state
+- **Window/tray handles**: `IWindowHandle` and `ITrayHandle` are domain abstractions — `IWindowService` and `ITrayService` contain no electron types; the Electron adapters wrap `BrowserWindow`/`Tray` to satisfy them
 - **No module-level singletons** — tray, windows, and polling state are instance fields on their services
 - **No callback injection anti-pattern** — `setPollingCallbacks()` is replaced by `PollingService.registerHandlers()` with typed interface
 
@@ -104,6 +125,7 @@ Notifications respect `settings.notifications.enabled` and use per-trigger coold
 
 ### IPC Events
 - **Main → Renderer**: `gpu-data-update` — pushes full agent+GPU state on every poll cycle. Payload shape: `GpuDataPayload` (from `@gpu-monitor/shared`)
+- **Main → Renderer**: `update-available` / `update-downloaded` — auto-updater events (version + release notes). Consumed by `UpdateBanner` in the renderer.
 - **Renderer → Main**: `get-settings`, `save-settings`, `on-window-close`, `open-preferences`, `close-preferences` — types defined in `@gpu-monitor/shared` (`IElectronAPI`)
 - Tray menu "Refresh Agents" calls polling directly (no IPC round-trip)
 
@@ -151,8 +173,9 @@ Key rules:
 - All fetched GPU data must pass through `validateGpuResponse()` before being used
 - Settings validation uses Zod schema (`settingsSchema.parse()`) — never `typeof` checks
 - Agent URLs validated via `agentUrlSchema` (http/https only) — never accept `file://` or other schemes
-- Notification dispatch is split into `dispatchMetric` / `dispatchAgentTransition` / `dispatchAllRecovered` — keep that boundary
-- Tray icon uses per-metric thresholds (`getTempState()` + `worstState()`) — never compare junction/vram temps against core thresholds
+- Notification dispatch is split into `dispatchMetric` / `processAgentTransition` / `dispatchAllRecovered` — keep that boundary
+- Threshold evaluation always goes through shared `evaluateStatus()` — never reimplement temp-vs-threshold logic in main or renderer
+- Domain interfaces never expose electron types — use `IWindowHandle` / `ITrayHandle` abstractions
 - No `!` non-null assertions in polling path — use discriminated unions or null checks
 - Domain services depend on adapter interfaces, not `electron` directly
 

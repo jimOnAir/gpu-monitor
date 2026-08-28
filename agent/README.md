@@ -6,9 +6,11 @@ C-агент для чтения температур NVIDIA GPU и отобра
 
 - Чтение Core, Junction, VRAM температур
 - GPU utilization, memory, power
-- Индикаторы статуса (normal/warning/danger)
 - HTTP API для Electron-клиента
-- Настройка порогов через env vars
+
+Агент отправляет только «сырые» температуры. Оценка статуса
+(normal/warning/danger) выполняется приложением GPU Monitor
+по пользовательским порогам.
 
 ## Зависимости
 
@@ -53,11 +55,8 @@ GPUTEMP_PORT=9100 sudo ./gputempd
       "gpuUtilization": 0.0,
       "memoryUsed": 4431924224,
       "memoryTotal": 25769803776,
-      "powerUsage": 20.4,
-       "coreStatus": "normal",
-       "junctionStatus": "normal",
-       "vramStatus": "normal",
-       "vendor": "MSI",
+       "powerUsage": 20.4,
+        "vendor": "MSI",
        "model": "MAG RTX 3090",
        "partNumber": "MS-7C83"
      }
@@ -81,9 +80,6 @@ GPUTEMP_PORT=9100 sudo ./gputempd
 | `gpus[].memoryUsed` | int | Video memory used (bytes) |
 | `gpus[].memoryTotal` | int | Total video memory (bytes) |
 | `gpus[].powerUsage` | float | Power draw (W) |
-| `gpus[].coreStatus` | string | `normal`, `warning`, or `danger` |
-| `gpus[].junctionStatus` | string | `normal`, `warning`, or `danger` |
-| `gpus[].vramStatus` | string | `normal`, `warning`, or `danger` |
 | `gpus[].fanSpeed` | int | Fan speed (0-100 %) |
 | `gpus[].gpuClockMHz` | int | Current GPU core clock (MHz) |
 | `gpus[].memClockMHz` | int | Current memory clock (MHz) |
@@ -102,17 +98,6 @@ GPUTEMP_PORT=9100 sudo ./gputempd
 
 ```json
 {"status":"ok"}
-```
-
-## Настройка порогов (env vars)
-
-```bash
-GPUTEMP_CORE_WARN=70           # Core temp warning (default: 70)
-GPUTEMP_CORE_DANGER=85         # Core temp danger (default: 85)
-GPUTEMP_JUNCTION_WARN=80       # Junction temp warning (default: 80)
-GPUTEMP_JUNCTION_DANGER=95     # Junction temp danger (default: 95)
-GPUTEMP_VRAM_WARN=80           # VRAM temp warning (default: 80)
-GPUTEMP_VRAM_DANGER=95         # VRAM temp danger (default: 95)
 ```
 
 ## Настройка логирования (env vars)

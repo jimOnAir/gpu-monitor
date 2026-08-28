@@ -3,7 +3,8 @@ export { EIPC } from './enums/EIPC';
 export type { IGpu } from './types/IGpu';
 export type { IAgent } from './types/IAgent';
 export type { ISettings, ITemperatureThresholds, INotificationsConfig, INotificationCooldowns } from './types/ISettings';
-export { DEFAULT_SETTINGS } from './types/ISettings';
+export { DEFAULT_SETTINGS, evaluateStatus, worstStatus } from './status';
+export type { MetricStatus } from './status';
 export type {
   IElectronAPI,
   IElectronInvokeApi,

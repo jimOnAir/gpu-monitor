@@ -1,5 +1,5 @@
 import { EAgentStatus } from '@gpu-monitor/shared';
-import type { IAgent, IGpu } from '@gpu-monitor/shared';
+import type { IAgent, IGpu, ISettings } from '@gpu-monitor/shared';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
@@ -26,15 +26,26 @@ const mockGpu: IGpu = {
   memoryUsed: 4000,
   memoryTotal: 8000,
   powerUsage: 150,
-  coreStatus: 'normal',
-  junctionStatus: 'normal',
-  vramStatus: 'normal',
 };
 
 const mockGpuData = [
   { gpu: mockGpu, agentName: 'Test Agent' },
   { gpu: { ...mockGpu, index: 1, name: 'NVIDIA GPU 1' }, agentName: 'Test Agent' },
 ];
+
+const mockSettings: ISettings = {
+  agents: [mockAgent],
+  refreshInterval: 5000,
+  thresholds: {
+    core: { warn: 70, critical: 85 },
+    junction: { warn: 80, critical: 95 },
+    vram: { warn: 80, critical: 95 },
+  },
+  notifications: {
+    enabled: true,
+    cooldowns: { tempCritical: 60000, tempWarn: 120000, tempRecover: 60000, agentOffline: 30000, agentOnline: 30000, allRecovered: 300000 },
+  },
+};
 
 describe('AgentSection', () => {
   it('renders agent name and URL', () => {
@@ -43,6 +54,7 @@ describe('AgentSection', () => {
         agentId="agent-1"
         gpuData={mockGpuData}
         agent={mockAgent}
+        settings={mockSettings}
         onGpuClick={() => {}}
       />,
     );
@@ -57,6 +69,7 @@ describe('AgentSection', () => {
         agentId="agent-1"
         gpuData={mockGpuData}
         agent={{ ...mockAgent, status: EAgentStatus.Online }}
+        settings={mockSettings}
         onGpuClick={() => {}}
       />,
     );
@@ -70,6 +83,7 @@ describe('AgentSection', () => {
         agentId="agent-1"
         gpuData={mockGpuData}
         agent={{ ...mockAgent, status: EAgentStatus.Offline }}
+        settings={mockSettings}
         onGpuClick={() => {}}
       />,
     );
@@ -83,6 +97,7 @@ describe('AgentSection', () => {
         agentId="agent-1"
         gpuData={mockGpuData}
         agent={{ ...mockAgent, status: EAgentStatus.Stale }}
+        settings={mockSettings}
         onGpuClick={() => {}}
       />,
     );
@@ -96,6 +111,7 @@ describe('AgentSection', () => {
         agentId="agent-1"
         gpuData={mockGpuData}
         agent={undefined}
+        settings={mockSettings}
         onGpuClick={() => {}}
       />,
     );
@@ -109,6 +125,7 @@ describe('AgentSection', () => {
         agentId="agent-1"
         gpuData={mockGpuData}
         agent={mockAgent}
+        settings={mockSettings}
         onGpuClick={() => {}}
       />,
     );
@@ -130,6 +147,7 @@ describe('AgentSection', () => {
         agentId="agent-1"
         gpuData={mockGpuData}
         agent={mockAgent}
+        settings={mockSettings}
         onGpuClick={onGpuClick}
       />,
     );
@@ -152,6 +170,7 @@ describe('AgentSection', () => {
         agentId="agent-1"
         gpuData={mockGpuData}
         agent={undefined}
+        settings={mockSettings}
         onGpuClick={() => {}}
       />,
     );

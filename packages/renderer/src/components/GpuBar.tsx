@@ -1,10 +1,13 @@
+import type { MetricStatus } from '@gpu-monitor/shared';
 import React from 'react';
+
+import { getStatusColor } from '../utils/statusDisplay';
 
 interface GpuBarProps {
   value: number;
   max: number;
   unit?: string;
-  status: 'normal' | 'warning' | 'danger';
+  status: MetricStatus;
   showDetail?: boolean;
   animated?: boolean;
 }
@@ -47,14 +50,3 @@ export const GpuBar: React.FC<GpuBarProps> = ({
     </div>
   );
 };
-
-function getStatusColor(status: 'normal' | 'warning' | 'danger'): string {
-  switch (status) {
-    case 'normal':
-      return 'var(--status-normal, #4CAF50)';
-    case 'warning':
-      return 'var(--status-warning, #FFC107)';
-    case 'danger':
-      return 'var(--status-danger, #F44336)';
-  }
-}

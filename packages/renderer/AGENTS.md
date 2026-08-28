@@ -14,7 +14,10 @@ React-based GPU monitoring dashboard. Displays clickable GPU cards with temp/uti
 - Domain services are platform-agnostic (no Electron imports in `domains/`)
 - No polling — receives `gpu-data-update` via IPC from main process
 - `preload.d.ts` re-exports IPC types from `@gpu-monitor/shared` (`IElectronAPI`, `GpuDataPayload`, `FetchResult`)
-- Shared constants in `utils/constants.ts` — `GB` and status helpers (`getMemoryStatus`, `getPowerStatus`, `getGpuUtilizationStatus`); threshold values are internal to the module; imported by `GpuCard`, `GpuDetailModal`, and tests
+- `types/AgentState.ts` — `AgentState` is derived from shared `AgentData` (`Omit<AgentData, 'prevAgentStatus'>`); no hand-copied type
+- **Display vocabulary** in `utils/statusDisplay.ts` — `getAgentStatusLabel`, `getStatusColor`, `formatValue`; single copy, imported by all components
+- **Threshold helpers** in `utils/constants.ts` — `GB`, `getMemoryStatus`, `getPowerStatus`, `getGpuUtilizationStatus` (return shared `MetricStatus`); threshold values are internal to the module
+- **Temperature status** is computed via shared `evaluateStatus(temp, warn, critical)` against `settings.thresholds` — the C agent no longer sends `coreStatus`/`junctionStatus`/`vramStatus`; user-configured thresholds drive UI colors
 - App uses `GpuDataPayload` (from `@gpu-monitor/shared`) for the IPC payload type directly
 
 ## Work Guidance
@@ -29,7 +32,8 @@ App.tsx (root orchestrator)
 │   │       ├── agent-section-header (name, endpoint URL, status badge)
 │   │       └── gpu-grid (2-column responsive grid)
 │   │           └── GpuCard (clickable → opens GpuDetailModal)
-│   └── Empty state (no GPU data)
+ │   └── Empty state (no GPU data)
+├── UpdateBanner (auto-update status: downloading / restart to install)
 ├── Footer (last update time, refresh interval)
 ├── SettingsModal (includes notifications section)
 ├── GpuDetailModal (full GPU info, auto-updates from live state)
@@ -37,9 +41,10 @@ App.tsx (root orchestrator)
 ```
 
 **Key components:**
-- **GpuCard** — compact summary (temps, utilization, power). Click opens detail modal.
+- **GpuCard** — compact summary (temps, utilization, power). Click opens detail modal. Temp status via shared `evaluateStatus()` against `settings.thresholds`.
+- **UpdateBanner** — subscribes to `onUpdateAvailable`/`onUpdateDownloaded` IPC events; shows a dismissible banner above the footer.
 - **GpuDetailModal** — full GPU breakdown (identity, temps w/ thresholds, performance, utilization, power). Resolves GPU data live from `agentState` on every render.
-- **DashboardService** — aggregates GPU data across agents for display (groups by agent, flattens, finds critical GPU).
+- **Dashboard functions** — cross-agent aggregation (groups by agent, unreachable list, timestamps, driver version).
 
 **State flow:**
 1. Main process polls agents, evaluates notifications, pushes `gpu-data-update` to renderer via IPC
@@ -48,10 +53,12 @@ App.tsx (root orchestrator)
 4. Modal resolves GPU live from `agentState.gpus` → updates automatically as data refreshes
 
 ### Domain Services
-- `domains/dashboard/DashboardService.ts` — cross-agent aggregation
+- `domains/dashboard/DashboardService.ts` — pure functions: `isReachable`, `getGpusByAgent`, `getUnreachableAgents`, `getLastUpdateTime`, `getDriverVersion`
 
 ### Utilities
-- `utils/constants.ts` — status helpers (`getMemoryStatus`, `getPowerStatus`, `getGpuUtilizationStatus`) and `GB` constant. Threshold values (memory ratios, power ratios, absolute power) are internal. `getGpuUtilizationStatus` replaces inline threshold checks in `GpuCard` and `GpuDetailModal`. Imported by `GpuCard`, `GpuDetailModal`, and their tests.
+- `utils/statusDisplay.ts` — display vocabulary: `getAgentStatusLabel`, `getStatusColor`, `formatValue`
+- `utils/constants.ts` — threshold helpers (`getMemoryStatus`, `getPowerStatus`, `getGpuUtilizationStatus`) and `GB` constant. Threshold values (memory ratios, power ratios, absolute power) are internal.
+- `utils/useSettings.ts` — loads settings from Electron API on mount; used by both `App` and `SettingsApp`
 
 ### Building
 ```bash

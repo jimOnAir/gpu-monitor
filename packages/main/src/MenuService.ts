@@ -19,7 +19,7 @@ export class MenuService {
               label: 'Preferences...',
               accelerator: 'CmdOrCtrl+,',
               click: () => {
-                this.windowService.createPreferencesWindow(this.windowService.getMainWindow());
+                this.windowService.togglePreferencesWindow();
               },
             },
             { type: 'separator' },

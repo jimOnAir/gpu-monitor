@@ -1,16 +1,14 @@
 import type { ISettings, IAgent, ITemperatureThresholds, INotificationCooldowns } from '@gpu-monitor/shared';
 import { EAgentStatus } from '@gpu-monitor/shared';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface SettingsModalProps {
-  isOpen: boolean;
   onClose: () => void;
   settings: ISettings;
   onSave: (settings: ISettings) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
-  isOpen,
   onClose,
   settings,
   onSave,
@@ -20,20 +18,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [thresholds, setThresholds] = useState<ITemperatureThresholds>(settings.thresholds);
   const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notifications.enabled);
   const [cooldowns, setCooldowns] = useState<INotificationCooldowns>(settings.notifications.cooldowns);
-
-  useEffect(() => {
-    if (isOpen) {
-      setAgents(settings.agents);
-      setRefreshInterval(settings.refreshInterval);
-      setThresholds(settings.thresholds);
-      setNotificationsEnabled(settings.notifications.enabled);
-      setCooldowns(settings.notifications.cooldowns);
-    }
-  }, [isOpen, settings]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   const handleSave = () => {
     const newSettings: ISettings = {

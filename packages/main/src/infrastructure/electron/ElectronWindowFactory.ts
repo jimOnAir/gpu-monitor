@@ -1,9 +1,9 @@
 import type { BrowserWindow, NativeImage } from 'electron';
-import { nativeTheme } from 'electron';
-import { BrowserWindow as ElectronBrowserWindow } from 'electron';
+import { BrowserWindow as ElectronBrowserWindow, nativeTheme } from 'electron';
 import * as path from 'path';
 
 import type { IWindowFactory } from '../../domains/windows/IWindowFactory';
+import type { IWindowHandle } from '../../domains/windows/IWindowHandle';
 
 export interface IThemeColors {
   dark: string;
@@ -22,24 +22,31 @@ export class ElectronWindowFactory implements IWindowFactory {
     height?: number,
     minWidth?: number,
     minHeight?: number,
-    parent?: BrowserWindow,
+    parent?: IWindowHandle | null,
     backgroundColor?: string,
-    icon?: NativeImage,
+    icon?: unknown,
     hasShadow?: boolean,
     roundedCorners?: boolean,
     titleBarStyle?: 'hidden' | 'default',
     show?: boolean,
-  }): BrowserWindow {
+    loadFile: string,
+    onReadyToShow: () => void,
+    onFocus: () => void,
+    onBlur: () => void,
+    onClose: (event: { preventDefault: () => void }) => void,
+    onWillNavigate: (event: { preventDefault: () => void }, url: string) => void,
+    onWindowOpen: (url: string) => 'allow' | 'deny',
+  }): IWindowHandle {
     const bgColor = opts.backgroundColor || (nativeTheme.shouldUseDarkColors ? this.themeColors.dark : this.themeColors.light);
 
-    return new ElectronBrowserWindow({
+    const win = new ElectronBrowserWindow({
       x: opts.x,
       y: opts.y,
       width: opts.width,
       height: opts.height,
       minWidth: opts.minWidth,
       minHeight: opts.minHeight,
-      parent: opts.parent,
+      parent: opts.parent ? (opts.parent as unknown as BrowserWindow) : undefined,
       frame: false,
       transparent: false,
       resizable: true,
@@ -49,7 +56,7 @@ export class ElectronWindowFactory implements IWindowFactory {
       roundedCorners: opts.roundedCorners ?? false,
       titleBarStyle: opts.titleBarStyle ?? 'default',
       backgroundColor: bgColor,
-      icon: opts.icon,
+      icon: opts.icon as NativeImage | undefined,
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
@@ -57,5 +64,49 @@ export class ElectronWindowFactory implements IWindowFactory {
         sandbox: true,
       },
     });
+
+    win.loadFile(opts.loadFile);
+
+    win.once('ready-to-show', () => {
+      opts.onReadyToShow();
+    });
+    win.on('focus', () => {
+      opts.onFocus();
+    });
+    win.on('blur', () => {
+      opts.onBlur();
+    });
+    win.on('close', (event) => {
+      opts.onClose(event);
+    });
+    win.webContents.on('will-navigate', (event, url) => {
+      opts.onWillNavigate(event, url);
+    });
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      return { action: opts.onWindowOpen(url) };
+    });
+
+    return {
+      show: () => {
+        win.show();
+      },
+      hide: () => {
+        win.hide();
+      },
+      focus: () => {
+        win.focus();
+      },
+      isMinimized: () => win.isMinimized(),
+      restore: () => {
+        win.restore();
+      },
+      isVisible: () => win.isVisible(),
+      close: () => {
+        win.close();
+      },
+      send: (channel: string, ...args: unknown[]) => {
+        win.webContents.send(channel, ...args);
+      },
+    };
   }
 }

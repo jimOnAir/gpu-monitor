@@ -15,8 +15,8 @@ export class NodeFileStorage implements IFileStorage {
     return fs.readFileSync(path, encoding);
   }
 
-  writeFileSync(path: string, data: string, options?: fs.WriteFileOptions): void {
-    fs.writeFileSync(path, data, options);
+  writeFileSync(path: string, data: string, options?: { mode?: number, encoding?: string }): void {
+    fs.writeFileSync(path, data, options as fs.WriteFileOptions);
   }
 
   mkdirSync(path: string, options: { recursive: true }): void {

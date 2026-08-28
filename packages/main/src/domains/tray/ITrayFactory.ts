@@ -1,7 +1,13 @@
-import type { MenuItemConstructorOptions, Menu, Tray } from 'electron';
+import type { ITrayHandle } from './ITrayHandle';
+
+export interface ITrayMenuItem {
+  label?: string;
+  click?: () => void;
+  type?: 'separator';
+}
 
 export interface ITrayFactory {
-  create: (icon: Electron.NativeImage) => Tray;
-  buildContextMenu: (template: MenuItemConstructorOptions[]) => Menu;
-  setContextMenu: (tray: Tray, menu: Menu) => void;
+  create: (icon: unknown) => ITrayHandle;
+  buildContextMenu: (template: ITrayMenuItem[]) => unknown;
+  setContextMenu: (tray: ITrayHandle, menu: unknown) => void;
 }

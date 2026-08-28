@@ -102,11 +102,13 @@ npm run package                      # build + electron-builder --linux AppImage
 
 ## Architecture Notes
 
-- **Domain/adapter pattern in main**: `domains/` has no Electron imports. `infrastructure/electron/` adapters bridge to `electron` module. `AppBootstrap` is the composition root.
-- **Validation pipeline**: raw agent HTTP responses → `classifyResult()` → `validateGpuResponse()` (Zod) → stored/used. Never skip validation.
-- **Notifications in main only**: `NotificationService` evaluates per-metric thresholds (core/junction/vram independently) and fires `Electron.Notification`. Renderer is pure display.
-- **Tray icon uses per-metric evaluation**: junction/vram critical temps override core-only normal state. 4 states: default(gray), normal(green), warning(yellow), critical(red).
-- **Agent polling via Node.js `http`**: main process fetches, not renderer. `Promise.allSettled` for parallel agent polling.
+- **Domain/adapter pattern in main**: `domains/` has no Electron imports. `infrastructure/electron/` adapters bridge to `electron` module. `AppBootstrap` is the composition root (wiring only — no behavior). Domain interfaces never expose electron types: `IWindowHandle` / `ITrayHandle` are the domain abstractions.
+- **Threshold evaluation**: single source of truth is `evaluateStatus()` / `worstStatus()` in `@gpu-monitor/shared` — consumed by tray, notifications, and renderer. One label vocabulary: `normal | warning | danger`. The C agent reports raw temperatures only.
+- **Validation pipeline**: raw agent HTTP responses → `classifyResult()` → `validateGpuResponse()` (Zod) → stored/used. Never skip validation. Classification: `ok` / `fetch-failed` / `health-failed` / `invalid`.
+- **Notifications in main only**: `NotificationService` (self-contained: logger + dispatcher) evaluates per-metric thresholds with per-metric previous state and per-trigger cooldowns, fires `Electron.Notification`. Renderer is pure display.
+- **Tray icon uses per-metric evaluation** via shared `evaluateStatus()`: junction/vram critical temps override core-only normal state. 4 states: default(gray), normal(green), warning(yellow), critical(red).
+- **Poll cycle**: `PollingService` owns the active settings and the cycle (fetch → classify → stale → notify → tray → push). All entry points (interval, stale check, manual refresh) run the same `runCycle()`.
+- **Agent polling via Node.js `http`**: main process fetches, not renderer. `Promise.allSettled` for parallel agent polling; timeout enforced by `IHttpAdapter`.
 - **Settings validation**: Zod schema in `settings.ts`. Agent URLs validated via `agentUrlSchema` (http/https only, rejects `file://`).
 - **Preload** (`preload.ts`): `contextBridge` bridge exposing `IElectronAPI` types from `@gpu-monitor/shared`.
 
@@ -135,10 +137,25 @@ npm run package                      # build + electron-builder --linux AppImage
 - **`.fallow/` directory**: fallow analysis config present. Run `npx fallow audit --base HEAD` after changes to `main.ts`.
 - **Three different dev servers**: `npm start` runs concurrently, but for focused work use `npm run start:render` (webpack dev HMR) or `npm run start:main` (electron only, needs prior build).
 
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as GitHub issues via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical roles mapped to identical label strings: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
+
 ## Child DOX Index
 
 | Domain | Path | Purpose |
 |--------|------|---------|
+| docs/agents | `docs/agents/` | Engineering-skills config: issue tracker, triage labels, domain-doc layout |
 | agent | `agent/` | C daemon — GPU temperature monitoring HTTP server with NVML + /dev/mem support |
 | shared | `packages/shared/` | TypeScript interfaces and enums shared between Electron main and renderer |
 | main | `packages/main/` | Electron main process — polling, notification service, tray, IPC, esbuild-bundled |

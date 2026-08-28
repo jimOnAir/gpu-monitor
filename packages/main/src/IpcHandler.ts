@@ -19,18 +19,14 @@ export class IpcHandler {
   register(): void {
     ipcMain.handle(EIPC.WINDOW_CLOSE, (): IpcResult<void> => {
       this.logger.info('IPC window-close');
-      this.windowService.getMainWindow()?.hide();
+      this.windowService.hideMainWindow();
 
       return { success: true, data: undefined };
     });
 
     ipcMain.handle(EIPC.CLOSE_PREFERENCES, (): IpcResult<void> => {
       this.logger.info('IPC close-preferences');
-      const win = this.windowService.getPreferencesWindow();
-      if (win) {
-        win.hide();
-        this.windowService.setPreferencesWindow(null);
-      }
+      this.windowService.togglePreferencesWindow();
 
       return { success: true, data: undefined };
     });
@@ -48,19 +44,16 @@ export class IpcHandler {
       return { success: true, data: undefined };
     });
 
-    ipcMain.handle(EIPC.SAVE_SETTINGS, (_event: unknown, settings: unknown): IpcResult<boolean> => {
-      const validated = parseSettings(settings);
-      if (!validated) {
-        this.logger.error('IPC save-settings: settings validation failed');
-
+    ipcMain.handle(EIPC.SAVE_SETTINGS, (_event: unknown, rawSettings: unknown): IpcResult<boolean> => {
+      const parsed = parseSettings(rawSettings, this.logger);
+      if (!parsed) {
         return { success: false, error: 'Invalid settings' };
       }
-      const agents = validated.agents.length;
-      this.logger.info({ agents }, 'IPC save-settings');
-      if (!this.settingsRepository.save(validated)) {
-        return { success: false, error: 'Failed to write settings file' };
+      this.logger.info({ agents: parsed.agents.length }, 'IPC save-settings');
+      if (!this.settingsRepository.save(parsed)) {
+        return { success: false, error: 'Invalid settings' };
       }
-      this.pollingService.startPolling(validated);
+      void this.pollingService.refreshAgents();
 
       return { success: true, data: true };
     });

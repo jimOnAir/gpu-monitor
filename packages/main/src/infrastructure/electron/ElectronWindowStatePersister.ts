@@ -1,6 +1,7 @@
-import { type BrowserWindow } from 'electron';
+import type { BrowserWindow } from 'electron';
 import windowStateKeeper from 'electron-window-state';
 
+import type { IWindowHandle } from '../../domains/windows/IWindowHandle';
 import type { IWindowState, IWindowStatePersister } from '../../domains/windows/IWindowStatePersister';
 
 export class ElectronWindowStatePersister implements IWindowStatePersister {
@@ -21,7 +22,7 @@ export class ElectronWindowStatePersister implements IWindowStatePersister {
     };
   }
 
-  save(window: BrowserWindow): void {
-    this.stateKeeper.manage(window);
+  save(window: IWindowHandle): void {
+    this.stateKeeper.manage(window as unknown as BrowserWindow);
   }
 }

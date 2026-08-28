@@ -1,28 +1,24 @@
 import { DEFAULT_SETTINGS, EAgentStatus } from '@gpu-monitor/shared';
-import type { ISettings } from '@gpu-monitor/shared';
-import type { GpuDataPayload } from '@gpu-monitor/shared';
+import type { GpuDataPayload, IAgent, ISettings } from '@gpu-monitor/shared';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { DebugPanel } from './components/DebugPanel';
 import { Footer } from './components/Footer';
 import { GpuCard } from './components/GpuCard';
 import { GpuDetailModal } from './components/GpuDetailModal';
-import { DashboardService } from './domains/dashboard/DashboardService';
+import { UpdateBanner } from './components/UpdateBanner';
+import { getDriverVersion, getGpusByAgent, getLastUpdateTime, getUnreachableAgents } from './domains/dashboard/DashboardService';
 import type { AgentState } from './types/AgentState';
-import { getAgentStatusLabel } from './utils/constants';
+import { getAgentStatusLabel } from './utils/statusDisplay';
 import { useSettings } from './utils/useSettings';
 import { useWindowFocus } from './utils/useWindowFocus';
 import './styles/main.css';
-
-// ---------- Services ----------
-
-const dashboardService = new DashboardService();
 
 // ---------- App ----------
 
 export const App: React.FC = () => {
   const isFocused = useWindowFocus();
-  const [loadedSettings, _isSettingsLoading, _setLoadedSettings] = useSettings();
+  const [loadedSettings] = useSettings();
   const [settings, setSettings] = useState<ISettings>(DEFAULT_SETTINGS);
 
   // Sync loaded settings into component state
@@ -69,8 +65,6 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Settings now opens in a separate window — no tray menu listener needed
-
   // Handle GPU card click
   const handleGpuClick = useCallback((agentId: string, agentName: string, gpu: import('@gpu-monitor/shared').IGpu, index: number) => {
     setSelectedGpu({ agentId, agentName, gpu, index });
@@ -81,12 +75,12 @@ export const App: React.FC = () => {
   }, []);
 
   // Prepare data for rendering
-  const gpusByAgent = dashboardService.getGpusByAgent(agentState);
-  const unreachableAgents = dashboardService.getUnreachableAgents(agentState);
-  const lastUpdate = dashboardService.getLastUpdateTime(agentState);
+  const gpusByAgent = getGpusByAgent(agentState);
+  const unreachableAgents = getUnreachableAgents(agentState);
+  const lastUpdate = getLastUpdateTime(agentState);
 
   // Driver version (all GPUs on one machine share the same driver)
-  const driverVersion = dashboardService.getDriverVersion(agentState);
+  const driverVersion = getDriverVersion(agentState);
 
   return (
     <div className={`app${!isFocused ? ' unfocused' : ''}`}>
@@ -132,6 +126,7 @@ export const App: React.FC = () => {
                   agentId={agentId}
                   gpuData={gpuData}
                   agent={agentState.agents.find((a) => a.id === agentId)}
+                  settings={settings}
                   onGpuClick={handleGpuClick}
                 />
               ))}
@@ -149,13 +144,14 @@ export const App: React.FC = () => {
         </div>
       </div>
 
+      {/* Update banner */}
+      <UpdateBanner visible={isFocused} />
+
       {/* Footer */}
       <Footer
         refreshInterval={settings.refreshInterval}
         lastUpdate={lastUpdate}
       />
-
-      {/* Settings now opens in a separate window */}
 
       {/* GPU Detail Modal */}
       {selectedGpu && (() => {
@@ -173,6 +169,7 @@ export const App: React.FC = () => {
             agentName={selectedGpu.agentName}
             agentStatus={agent?.status || EAgentStatus.Offline}
             driverVersion={driverVersion}
+            settings={settings}
             onClose={handleCloseGpuDetail}
           />
         );
@@ -193,11 +190,12 @@ export const App: React.FC = () => {
 interface AgentSectionProps {
   agentId: string;
   gpuData: Array<{ gpu: import('@gpu-monitor/shared').IGpu, agentName: string }>;
-  agent: import('@gpu-monitor/shared').IAgent | undefined;
+  agent: IAgent | undefined;
+  settings: ISettings;
   onGpuClick: (agentId: string, agentName: string, gpu: import('@gpu-monitor/shared').IGpu, index: number) => void;
 }
 
-export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, agent, onGpuClick }) => (
+export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, agent, settings, onGpuClick }) => (
   <div className="agent-section">
     <div className="agent-section-header">
       <h3>{gpuData[0].agentName}</h3>
@@ -212,7 +210,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, ag
           key={`${agentId}-gpu-${gpu.index}`}
           gpu={gpu}
           index={gpu.index}
-          agentName={gpuData[0].agentName}
+          settings={settings}
           onClick={() => {
             onGpuClick(agentId, gpuData[0].agentName, gpu, gpu.index);
           }}
@@ -223,7 +221,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, ag
 );
 
 interface UnreachableAgentProps {
-  agent: import('@gpu-monitor/shared').IAgent;
+  agent: IAgent;
   onGpuClick: (agentId: string, agentName: string, gpu: import('@gpu-monitor/shared').IGpu, index: number) => void;
 }
 
@@ -244,4 +242,3 @@ export const UnreachableAgent: React.FC<UnreachableAgentProps> = ({ agent }) => 
     )}
   </div>
 );
-

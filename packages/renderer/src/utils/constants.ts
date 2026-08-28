@@ -1,31 +1,12 @@
 /**
- * Shared constants and utility functions for GPU monitoring components.
- * Centralizes values that are used across multiple components.
+ * Shared constants and threshold helpers for GPU monitoring components.
+ * Display vocabulary (labels, colors, formatting) lives in statusDisplay.ts.
  */
 
-import { EAgentStatus } from '@gpu-monitor/shared';
+import type { MetricStatus } from '@gpu-monitor/shared';
 
 /** Bytes in one gibibyte (1024^3). */
 export const GB = 1024 * 1024 * 1024;
-
-/**
- * Map EAgentStatus to its display label.
- * Centralized so all components use the same labels.
- */
-export function getAgentStatusLabel(status?: EAgentStatus): string {
-  switch (status) {
-    case EAgentStatus.Pending:
-      return 'Pending';
-    case EAgentStatus.Online:
-      return 'Online';
-    case EAgentStatus.Offline:
-      return 'Offline';
-    case EAgentStatus.Stale:
-      return 'Stale';
-    default:
-      return 'Unknown';
-  }
-}
 
 /** Threshold ratios for memory utilization status. */
 const MEMORY_THRESHOLDS = {
@@ -48,7 +29,7 @@ const POWER_ABS_THRESHOLDS = {
 /**
  * Determine memory utilization status based on used/total ratio.
  */
-export function getMemoryStatus(used: number, total: number): 'normal' | 'warning' | 'danger' {
+export function getMemoryStatus(used: number, total: number): MetricStatus {
   const ratio = used / total;
   if (ratio > MEMORY_THRESHOLDS.danger) {
     return 'danger';
@@ -63,7 +44,7 @@ export function getMemoryStatus(used: number, total: number): 'normal' | 'warnin
 /**
  * Determine power utilization status based on usage and optional power cap.
  */
-export function getPowerStatus(usage: number, powerCapW?: number): 'normal' | 'warning' | 'danger' {
+export function getPowerStatus(usage: number, powerCapW?: number): MetricStatus {
   if (powerCapW) {
     if (usage > powerCapW * POWER_THRESHOLDS.danger) {
       return 'danger';
@@ -86,7 +67,7 @@ export function getPowerStatus(usage: number, powerCapW?: number): 'normal' | 'w
 /**
  * Determine GPU utilization status based on utilization percentage.
  */
-export function getGpuUtilizationStatus(utilization: number): 'normal' | 'warning' | 'danger' {
+export function getGpuUtilizationStatus(utilization: number): MetricStatus {
   if (utilization > 90) {
     return 'danger';
   }

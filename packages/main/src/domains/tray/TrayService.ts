@@ -1,43 +1,23 @@
-import type { ISettings } from '@gpu-monitor/shared';
-import type { Tray } from 'electron';
+import { evaluateStatus, worstStatus, type ISettings, type MetricStatus } from '@gpu-monitor/shared';
 
 import type { Logger } from '../../logger';
 import type { AgentData } from '../polling/AgentData';
 
 import type { IIconLoader } from './IIconLoader';
 import type { ITrayFactory } from './ITrayFactory';
+import type { ITrayHandle } from './ITrayHandle';
 import type { ITrayService } from './ITrayService';
 
-export function worstState(
-  current: 'normal' | 'warning' | 'critical',
-  ...others: Array<'normal' | 'warning' | 'critical'>
-): 'normal' | 'warning' | 'critical' {
-  for (const s of others) {
-    if (s === 'critical') {
-      return 'critical';
-    }
-  }
-  if (current === 'warning' || others.includes('warning')) {
-    return 'warning';
-  }
-
-  return 'normal';
-}
-
-export function getTempState(temp: number, thresholds: { warn: number, critical: number }): 'normal' | 'warning' | 'critical' {
-  if (temp >= thresholds.critical) {
-    return 'critical';
-  }
-  if (temp >= thresholds.warn) {
-    return 'warning';
-  }
-
-  return 'normal';
-}
+// Asset filenames use "critical" where the status vocabulary says "danger".
+const ICON_FILE_FOR_STATE: Record<MetricStatus, string> = {
+  normal: 'normal',
+  warning: 'warning',
+  danger: 'critical',
+};
 
 export class TrayService implements ITrayService {
-  private tray: Tray | null = null;
-  private lastTrayState: 'normal' | 'warning' | 'critical' | null = null;
+  private tray: ITrayHandle | null = null;
+  private lastTrayState: MetricStatus | null = null;
 
   constructor(
     private readonly logger: Logger,
@@ -49,16 +29,17 @@ export class TrayService implements ITrayService {
     const newTray = this.trayFactory.create(this.iconLoader.loadBuildIcon());
     newTray.setToolTip('GPU Monitor');
 
-    const contextMenu = this.trayFactory.buildContextMenu([
+    const menuTemplate: Array<{ label?: string, click?: () => void, type?: 'separator' }> = [
       { label: 'Show', click: opts.onShow },
       { label: 'Refresh Agents', click: opts.onRefresh },
       { type: 'separator' },
       { label: 'Settings', click: opts.onOpenSettings },
       { type: 'separator' },
       { label: 'Exit', click: opts.onExit },
-    ]);
+    ];
 
-    this.logger.info({ menuItems: contextMenu.items.length }, 'Context menu built');
+    const contextMenu = this.trayFactory.buildContextMenu(menuTemplate);
+    this.logger.info({ menuItems: menuTemplate.length }, 'Context menu built');
     this.trayFactory.setContextMenu(newTray, contextMenu);
 
     // Left-click toggles window visibility (matches original behavior)
@@ -81,15 +62,15 @@ export class TrayService implements ITrayService {
     if (!this.tray) {
       return;
     }
-    let maxState: 'normal' | 'warning' | 'critical' = 'normal';
+    let maxState: MetricStatus = 'normal';
     const tooltipParts: string[] = [];
 
     for (const gpus of data.gpus.values()) {
       for (const gpu of gpus) {
-        const coreState = getTempState(gpu.coreTemp, settings.thresholds.core);
-        const junctionState = getTempState(gpu.junctionTemp, settings.thresholds.junction);
-        const vramState = getTempState(gpu.vramTemp, settings.thresholds.vram);
-        maxState = worstState(maxState, coreState, junctionState, vramState);
+        const coreState = evaluateStatus(gpu.coreTemp, settings.thresholds.core.warn, settings.thresholds.core.critical);
+        const junctionState = evaluateStatus(gpu.junctionTemp, settings.thresholds.junction.warn, settings.thresholds.junction.critical);
+        const vramState = evaluateStatus(gpu.vramTemp, settings.thresholds.vram.warn, settings.thresholds.vram.critical);
+        maxState = worstStatus(maxState, coreState, junctionState, vramState);
         const coreT = String(gpu.coreTemp);
         const junctionT = String(gpu.junctionTemp);
         const vramT = String(gpu.vramTemp);
@@ -98,11 +79,11 @@ export class TrayService implements ITrayService {
         tooltipParts.push(
           `${gpu.name} | ${coreT}/${junctionT}/${vramT}\u00B0C | ${utilPct}% | ${watts}W`,
         );
-        if (maxState === 'critical') {
+        if (maxState === 'danger') {
           break;
         }
       }
-      if (maxState === 'critical') {
+      if (maxState === 'danger') {
         break;
       }
     }
@@ -116,11 +97,11 @@ export class TrayService implements ITrayService {
     }
   }
 
-  getTray(): Tray | null {
+  getTray(): ITrayHandle | null {
     return this.tray;
   }
 
-  private updateTrayIcon(state: 'normal' | 'warning' | 'critical'): void {
+  private updateTrayIcon(state: MetricStatus): void {
     if (!this.tray) {
       return;
     }
@@ -128,6 +109,6 @@ export class TrayService implements ITrayService {
       return;
     }
     this.lastTrayState = state;
-    this.tray.setImage(this.iconLoader.loadIcon(state));
+    this.tray.setImage(this.iconLoader.loadIcon(ICON_FILE_FOR_STATE[state]));
   }
 }

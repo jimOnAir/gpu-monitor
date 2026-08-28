@@ -1,7 +1,8 @@
 import type { ISettings } from '@gpu-monitor/shared';
-import type { Tray } from 'electron';
 
 import type { AgentData } from '../polling/AgentData';
+
+import type { ITrayHandle } from './ITrayHandle';
 
 export interface ITrayService {
   createTray: (opts: {
@@ -11,5 +12,5 @@ export interface ITrayService {
     onExit: () => void,
   }) => void;
   updateTrayFromData: (data: AgentData, settings: ISettings) => void;
-  getTray: () => Tray | null;
+  getTray: () => ITrayHandle | null;
 }

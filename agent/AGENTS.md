@@ -1,7 +1,7 @@
 # C Daemon — GPU Temperature Monitor
 
 ## Purpose
-Production C daemon that reads GPU temperatures via NVML and /dev/mem mmap (for Junction/VRAM temps), serves them over HTTP, and exposes a JSON API for the Electron app to poll.
+Production C daemon that reads GPU temperatures via NVML and /dev/mem mmap (for Junction/VRAM temps), serves them over HTTP, and exposes a JSON API for the Electron app to poll. The agent reports **raw temperatures only** — status evaluation (normal/warning/danger) is done by the GPU Monitor app against user-configured thresholds.
 
 ## Ownership
 `agent/` directory and its contents. Build artifacts (`*.o`, `gputempd`) are generated and gitignored.

@@ -1,16 +1,16 @@
 import type { ISettings } from '@gpu-monitor/shared';
-import type { BrowserWindow, Tray } from 'electron';
 
 import type { AgentData } from '../polling/AgentData';
 
+import type { IWindowHandle } from './IWindowHandle';
+
 export interface IWindowService {
-  createMainWindow: (settings: ISettings, tray: Tray | null) => void;
-  createPreferencesWindow: (parent: BrowserWindow | null) => void;
+  createMainWindow: (settings: ISettings) => void;
+  showMainWindow: () => void;
+  hideMainWindow: () => void;
+  getMainWindow: () => IWindowHandle | null;
+  ensureMainWindow: (settings: ISettings) => void;
   togglePreferencesWindow: () => void;
-  getMainWindow: () => BrowserWindow | null;
-  getPreferencesWindow: () => BrowserWindow | null;
-  setPreferencesWindow: (win: BrowserWindow | null) => void;
   setWillQuit: (value: boolean) => void;
-  buildTrustedOrigins: (settings: ISettings) => Set<string>;
   pushToRenderer: (data: AgentData) => void;
 }

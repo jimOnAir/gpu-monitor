@@ -1,40 +1,24 @@
 import { DEFAULT_SETTINGS, type ISettings } from '@gpu-monitor/shared';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 import { SettingsModal } from './components/SettingsModal';
+import { useSettings } from './utils/useSettings';
+
+// Delay before auto-closing the preferences window so the user sees the success state.
+const CLOSE_DELAY_MS = 1000;
 
 /**
  * Standalone settings page for the Preferences window.
  * Loads settings from Electron API and provides save functionality.
  */
 export const SettingsApp: React.FC = () => {
+  const [loadedSettings, isLoading] = useSettings();
   const [settings, setSettings] = useState<ISettings>(DEFAULT_SETTINGS);
-  const [isLoading, setIsLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load settings on mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        if (window.electronAPI) {
-          const result = await window.electronAPI.getSettings();
-          if (result.success && result.data) {
-            setSettings(result.data);
-          } else {
-            setError(result.error || 'Failed to load settings');
-          }
-        } else {
-          setError('window.electronAPI is not available');
-        }
-      } catch (err) {
-        setError(`Failed to load settings: ${err}`);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    void loadSettings();
-  }, []);
+  // Sync loaded settings into component state
+  const effectiveSettings = loadedSettings ?? settings;
 
   // Save settings
   const handleSave = useCallback(async (newSettings: ISettings) => {
@@ -44,10 +28,9 @@ export const SettingsApp: React.FC = () => {
         if (result.success) {
           setSettings(newSettings);
           setSaveSuccess(true);
-          // Close the preferences window after successful save
           setTimeout(() => {
             void window.electronAPI?.onClosePreferences();
-          }, 1000);
+          }, CLOSE_DELAY_MS);
         } else {
           setError(result.error || 'Failed to save settings');
         }
@@ -88,11 +71,10 @@ export const SettingsApp: React.FC = () => {
 
       <div className="settings-content">
         <SettingsModal
-          isOpen={true}
           onClose={() => {
             void window.electronAPI?.onClosePreferences();
           }}
-          settings={settings}
+          settings={effectiveSettings}
           onSave={handleSave}
         />
       </div>

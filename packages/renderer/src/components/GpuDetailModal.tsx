@@ -1,8 +1,8 @@
-import type { IGpu } from '@gpu-monitor/shared';
-import { EAgentStatus } from '@gpu-monitor/shared';
+import { evaluateStatus, type EAgentStatus, type IGpu, type ISettings, type MetricStatus } from '@gpu-monitor/shared';
 import React from 'react';
 
 import { GB, getGpuUtilizationStatus, getMemoryStatus, getPowerStatus } from '../utils/constants';
+import { getAgentStatusLabel, getStatusColor } from '../utils/statusDisplay';
 
 import { GpuBar } from './GpuBar';
 
@@ -12,6 +12,7 @@ interface GpuDetailModalProps {
   agentName: string;
   agentStatus: EAgentStatus;
   driverVersion?: string;
+  settings: ISettings;
   onClose: () => void;
 }
 
@@ -30,7 +31,7 @@ const GpuSection: React.FC<GpuSectionProps> = ({ title, children }) => (
 interface MetricRowProps {
   label: string;
   value: string;
-  status?: 'normal' | 'warning' | 'danger';
+  status?: MetricStatus;
   hint?: string;
 }
 
@@ -47,7 +48,7 @@ interface MetricBarProps {
   value: number;
   max: number;
   unit: string;
-  status: 'normal' | 'warning' | 'danger';
+  status: MetricStatus;
   hint?: string;
 }
 
@@ -79,7 +80,7 @@ const MetricBar: React.FC<MetricBarProps> = ({ label, value, max, unit, status, 
 interface TempRowProps {
   label: string;
   value: number;
-  status: 'normal' | 'warning' | 'danger';
+  status: MetricStatus;
   shutdown?: number;
   slowdown?: number;
 }
@@ -106,6 +107,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
   agentName,
   agentStatus,
   driverVersion,
+  settings,
   onClose,
 }) => {
   const handleBackdropClick = (e?: React.MouseEvent) => {
@@ -134,7 +136,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
             <h2 className="detail-header-name">GPU {gpuIndex}: {gpu.name}</h2>
             <div className="detail-header-meta">
               <span className={`agent-status-badge ${agentStatus}`}>
-                {getStatusLabel(agentStatus)}
+                {getAgentStatusLabel(agentStatus)}
               </span>
               <span className="detail-agent-source">{agentName}</span>
               {driverVersion && (
@@ -189,21 +191,21 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                 <TempRow
                   label="Core"
                   value={gpu.coreTemp}
-                  status={gpu.coreStatus ?? 'normal'}
+                  status={evaluateStatus(gpu.coreTemp, settings.thresholds.core.warn, settings.thresholds.core.critical)}
                   shutdown={gpu.tempShutdown}
                   slowdown={gpu.tempSlowdown}
                 />
                 <TempRow
                   label="Junction"
                   value={gpu.junctionTemp}
-                  status={gpu.junctionStatus ?? 'normal'}
+                  status={evaluateStatus(gpu.junctionTemp, settings.thresholds.junction.warn, settings.thresholds.junction.critical)}
                   shutdown={gpu.tempShutdown}
                   slowdown={gpu.tempSlowdown}
                 />
                 <TempRow
                   label="VRAM"
                   value={gpu.vramTemp}
-                  status={gpu.vramStatus ?? 'normal'}
+                  status={evaluateStatus(gpu.vramTemp, settings.thresholds.vram.warn, settings.thresholds.vram.critical)}
                   shutdown={gpu.tempShutdown}
                   slowdown={gpu.tempSlowdown}
                 />
@@ -299,28 +301,4 @@ export function getPerfStateLabel(pstate: number | undefined): string {
   }
 
   return `P${pstate} (Low)`;
-}
-
-export function getStatusLabel(status: EAgentStatus): string {
-  switch (status) {
-    case EAgentStatus.Online:
-      return 'Online';
-    case EAgentStatus.Offline:
-      return 'Offline';
-    case EAgentStatus.Stale:
-      return 'Stale';
-    default:
-      return 'Unknown';
-  }
-}
-
-function getStatusColor(status: 'normal' | 'warning' | 'danger'): string {
-  switch (status) {
-    case 'normal':
-      return 'var(--status-normal, #4CAF50)';
-    case 'warning':
-      return 'var(--status-warning, #FFC107)';
-    case 'danger':
-      return 'var(--status-danger, #F44336)';
-  }
 }

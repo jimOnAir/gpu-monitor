@@ -18,9 +18,6 @@ struct GpuData {
     uint64_t memoryUsed;
     uint64_t memoryTotal;
     double powerUsage;
-    const char *coreStatus;
-    const char *junctionStatus;
-    const char *vramStatus;
     /* Extended metrics */
     int fanSpeed;           /* 0-100 percent */
     int gpuClockMHz;        /* current shared clock */

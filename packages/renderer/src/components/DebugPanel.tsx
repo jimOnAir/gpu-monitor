@@ -13,7 +13,7 @@ const FETCH_RESULT_LABELS: Record<FetchResult, string> = {
   'ok': 'OK',
   'fetch-failed': 'FETCH FAIL',
   'health-failed': 'HEALTH FAIL',
-  'error': 'ERROR',
+  'invalid': 'INVALID',
 };
 
 const FETCH_RESULT_COLORS: Record<FetchResult, string> = {
@@ -21,7 +21,7 @@ const FETCH_RESULT_COLORS: Record<FetchResult, string> = {
   'ok': '#4CAF50',
   'fetch-failed': '#F44336',
   'health-failed': '#FF9800',
-  'error': '#F44336',
+  'invalid': '#F44336',
 };
 
 export const DebugPanel: React.FC<DebugPanelProps> = ({ agentState, visible, onToggle }) => {

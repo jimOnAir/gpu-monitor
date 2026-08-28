@@ -13,12 +13,10 @@
  * Env vars:
  *   GPUTEMP_PORT         - HTTP port (default: 8080)
  *   GPUTEMP_LOG_LEVEL    - Log level: DEBUG, INFO (default), WARN, ERROR
- *   GPUTEMP_CORE_WARN    - Core temp warning threshold (default: 70)
- *   GPUTEMP_CORE_DANGER  - Core temp danger threshold (default: 85)
- *   GPUTEMP_JUNCTION_WARN    - Junction temp warning threshold (default: 80)
- *   GPUTEMP_JUNCTION_DANGER  - Junction temp danger threshold (default: 95)
- *   GPUTEMP_VRAM_WARN    - VRAM temp warning threshold (default: 80)
- *   GPUTEMP_VRAM_DANGER  - VRAM temp danger threshold (default: 95)
+ *
+ * Note: the agent reports raw temperatures only. Status evaluation
+ * (normal/warning/danger) is done by the GPU Monitor app against
+ * user-configured thresholds.
  */
 
 #include <stdio.h>
@@ -43,12 +41,6 @@ static volatile int running = 1;
 
 void signal_handler(int sig __attribute__((unused))) {
     running = 0;
-}
-
-const char* determine_status(double temp, double warn, double danger) {
-    if (temp >= danger) return "danger";
-    if (temp >= warn) return "warning";
-    return "normal";
 }
 
 /**
@@ -128,19 +120,6 @@ void fill_gpu_status(struct GpuData *gpu, int index) {
         nvml_gpu_perf_state(index, &gpu->perfState);
     }
     nvml_gpu_driver_version(gpu->driverVersion, sizeof(gpu->driverVersion));
-    
-    // Determine status
-    double core_warn = atof(getenv("GPUTEMP_CORE_WARN") ? getenv("GPUTEMP_CORE_WARN") : "70");
-    double core_danger = atof(getenv("GPUTEMP_CORE_DANGER") ? getenv("GPUTEMP_CORE_DANGER") : "85");
-    gpu->coreStatus = determine_status(gpu->coreTemp, core_warn, core_danger);
-    
-    double junction_warn = atof(getenv("GPUTEMP_JUNCTION_WARN") ? getenv("GPUTEMP_JUNCTION_WARN") : "80");
-    double junction_danger = atof(getenv("GPUTEMP_JUNCTION_DANGER") ? getenv("GPUTEMP_JUNCTION_DANGER") : "95");
-    gpu->junctionStatus = determine_status(gpu->junctionTemp, junction_warn, junction_danger);
-    
-    double vram_warn = atof(getenv("GPUTEMP_VRAM_WARN") ? getenv("GPUTEMP_VRAM_WARN") : "80");
-    double vram_danger = atof(getenv("GPUTEMP_VRAM_DANGER") ? getenv("GPUTEMP_VRAM_DANGER") : "95");
-    gpu->vramStatus = determine_status(gpu->vramTemp, vram_warn, vram_danger);
 }
 
 char* generate_json_response(void) {
@@ -170,16 +149,12 @@ char* generate_json_response(void) {
         }
 
         // Escape all string fields for safe JSON embedding
-        char escaped_uuid[128], escaped_name[256], escaped_core_status[32];
-        char escaped_junction_status[32], escaped_vram_status[32];
+        char escaped_uuid[128], escaped_name[256];
         char escaped_driver_version[128], escaped_vendor[128];
         char escaped_model[128], escaped_part_number[128];
 
         json_escape_string(gpu->uuid, escaped_uuid, sizeof(escaped_uuid));
         json_escape_string(gpu->name, escaped_name, sizeof(escaped_name));
-        json_escape_string(gpu->coreStatus, escaped_core_status, sizeof(escaped_core_status));
-        json_escape_string(gpu->junctionStatus, escaped_junction_status, sizeof(escaped_junction_status));
-        json_escape_string(gpu->vramStatus, escaped_vram_status, sizeof(escaped_vram_status));
         json_escape_string(gpu->driverVersion, escaped_driver_version, sizeof(escaped_driver_version));
         json_escape_string(gpu->vendor, escaped_vendor, sizeof(escaped_vendor));
         json_escape_string(gpu->model, escaped_model, sizeof(escaped_model));
@@ -189,7 +164,6 @@ char* generate_json_response(void) {
             "{\"uuid\":\"%s\",\"index\":%d,\"name\":\"%s\","
             "\"coreTemp\":%.1f,\"junctionTemp\":%.1f,\"vramTemp\":%.1f,"
             "\"gpuUtilization\":%.1f,\"memoryUsed\":%lu,\"memoryTotal\":%lu,\"powerUsage\":%.1f,"
-            "\"coreStatus\":\"%s\",\"junctionStatus\":\"%s\",\"vramStatus\":\"%s\","
             "\"fanSpeed\":%d,\"gpuClockMHz\":%d,\"memClockMHz\":%d,"
             "\"tempShutdown\":%d,\"tempSlowdown\":%d,\"powerCapW\":%.1f,"
             "\"driverVersion\":\"%s\",\"perfState\":%d,"
@@ -204,9 +178,6 @@ char* generate_json_response(void) {
             gpu->memoryUsed,
             gpu->memoryTotal,
             gpu->powerUsage,
-            escaped_core_status,
-            escaped_junction_status,
-            escaped_vram_status,
             gpu->fanSpeed,
             gpu->gpuClockMHz,
             gpu->memClockMHz,
@@ -359,16 +330,13 @@ int main(int argc, char *argv[]) {
                    "  port      HTTP port (default: 8080, or GPUTEMP_PORT env var)\n"
                    "  --help    Show this help message\n"
                    "\n"
-                   "Environment:\n"
-                   "  GPUTEMP_PORT         - HTTP port\n"
-                   "  GPUTEMP_LOG_LEVEL    - Log level: DEBUG, INFO, WARN, ERROR\n"
-                   "  GPUTEMP_CORE_WARN    - Core temp warning threshold (default: 70)\n"
-                   "  GPUTEMP_CORE_DANGER  - Core temp danger threshold (default: 85)\n"
-                   "  GPUTEMP_JUNCTION_WARN  - Junction temp warning threshold (default: 80)\n"
-                   "  GPUTEMP_JUNCTION_DANGER  - Junction temp danger threshold (default: 95)\n"
-                   "  GPUTEMP_VRAM_WARN    - VRAM temp warning threshold (default: 80)\n"
-                   "  GPUTEMP_VRAM_DANGER  - VRAM temp danger threshold (default: 95)\n"
-                   "\n"
+                    "Environment:\n"
+                    "  GPUTEMP_PORT         - HTTP port\n"
+                    "  GPUTEMP_LOG_LEVEL    - Log level: DEBUG, INFO, WARN, ERROR\n"
+                    "\n"
+                    "Note: reports raw temperatures only — status evaluation is done\n"
+                    "by the GPU Monitor app against user-configured thresholds.\n"
+                    "\n"
                    "API:\n"
                    "  GET /gpu     - JSON {timestamp, gpus: [...]}\n"
                    "  GET /health  - {\"status\":\"ok\"}\n"

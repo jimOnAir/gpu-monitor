@@ -1,8 +1,9 @@
 import { EAgentStatus } from '@gpu-monitor/shared';
 import { describe, it, expect } from 'vitest';
 
+import { getAgentStatusLabel } from '../utils/statusDisplay';
+
 import { getPerfStateLabel } from './GpuDetailModal';
-import { getStatusLabel } from './GpuDetailModal';
 
 describe('getPerfStateLabel', () => {
   it('returns N/A for undefined', () => {
@@ -31,21 +32,20 @@ describe('getPerfStateLabel', () => {
   });
 });
 
-describe('getStatusLabel', () => {
+describe('getAgentStatusLabel', () => {
   it('returns Online for Online status', () => {
-    expect(getStatusLabel(EAgentStatus.Online)).toBe('Online');
+    expect(getAgentStatusLabel(EAgentStatus.Online)).toBe('Online');
   });
 
   it('returns Offline for Offline status', () => {
-    expect(getStatusLabel(EAgentStatus.Offline)).toBe('Offline');
+    expect(getAgentStatusLabel(EAgentStatus.Offline)).toBe('Offline');
   });
 
   it('returns Stale for Stale status', () => {
-    expect(getStatusLabel(EAgentStatus.Stale)).toBe('Stale');
+    expect(getAgentStatusLabel(EAgentStatus.Stale)).toBe('Stale');
   });
 
-  it('returns Unknown for default case', () => {
-    // The switch default returns 'Unknown' for any non-matched status
-    expect(getStatusLabel(EAgentStatus.Stale)).toBe('Stale');
+  it('returns Pending for Pending status', () => {
+    expect(getAgentStatusLabel(EAgentStatus.Pending)).toBe('Pending');
   });
 });

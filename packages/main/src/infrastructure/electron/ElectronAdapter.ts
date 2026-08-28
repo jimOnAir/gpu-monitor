@@ -29,7 +29,7 @@ export interface IElectronAdapter {
   menuFactory: IMenuFactory;
   crashRecovery: ICrashRecoveryService;
   fileStorage: IFileStorage;
-  buildTrayIcon: () => Electron.NativeImage;
+  buildTrayIcon: () => unknown;
   createWindowStatePersister: (options: { file: string, defaultWidth: number, defaultHeight: number }) => IWindowStatePersister;
 }
 
@@ -79,7 +79,7 @@ export class ElectronAdapter implements IElectronAdapter {
     return new ElectronWindowStatePersister(options);
   }
 
-  buildTrayIcon(): Electron.NativeImage {
+  buildTrayIcon(): unknown {
     return this.iconLoader.loadBuildIcon(true);
   }
 }

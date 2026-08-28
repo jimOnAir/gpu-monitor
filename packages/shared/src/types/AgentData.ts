@@ -7,7 +7,7 @@ import type { IGpu } from './IGpu';
  * Fetch result state for an individual agent poll cycle.
  * Defined in shared so both main (polling) and renderer (display) use the same type.
  */
-export type FetchResult = 'pending' | 'ok' | 'fetch-failed' | 'health-failed' | 'error';
+export type FetchResult = 'pending' | 'ok' | 'fetch-failed' | 'health-failed' | 'invalid';
 
 /**
  * Complete runtime state of all monitored agents and their GPUs.

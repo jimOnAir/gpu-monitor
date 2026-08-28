@@ -1,28 +1,49 @@
-import { EAgentStatus, type IAgent, type IGpu, type INotificationCooldowns, type ISettings } from '@gpu-monitor/shared';
+import { EAgentStatus, evaluateStatus, type IAgent, type IGpu, type INotificationCooldowns, type ISettings, type ITemperatureThresholds, type MetricStatus } from '@gpu-monitor/shared';
 import type { AgentData, FetchResult } from '@gpu-monitor/shared';
 
 import type { Logger } from '../../logger';
 
 import type { INotificationDispatcher } from './INotificationDispatcher';
 import type { INotificationService } from './INotificationService';
-import type { NotificationTextFormatter } from './NotificationTextFormatter';
-import { type NotificationType, TYPE_TO_COOLDOWN_KEY } from './NotificationTextFormatter';
-import type { TemperatureEvaluator } from './TemperatureEvaluator';
+
+type NotificationType = 'temp:critical' | 'temp:warn' | 'temp:recover' | 'agent:offline' | 'agent:online' | 'all:recovered';
+
+const TYPE_TO_COOLDOWN_KEY: Record<NotificationType, keyof INotificationCooldowns> = {
+  'temp:critical': 'tempCritical',
+  'temp:warn': 'tempWarn',
+  'temp:recover': 'tempRecover',
+  'agent:offline': 'agentOffline',
+  'agent:online': 'agentOnline',
+  'all:recovered': 'allRecovered',
+};
+
+interface TemperatureMetric {
+  metric: string;
+  temp: number;
+  warn: number;
+  critical: number;
+  status: MetricStatus;
+}
 
 /**
  * Evaluates GPU temperature and agent status against configured thresholds,
  * and dispatches native OS notifications with per-trigger cooldowns.
+ *
+ * State:
+ * - lastStates: per-metric previous status (key: `${agentId}:${metric}`)
+ * - warnedAgents: agents that had a warning/critical in a previous cycle
+ * - allRecovered: agents that already fired the all-recovered notification
+ * - cooldowns: last fire timestamp per trigger key
  */
 export class NotificationService implements INotificationService {
-  private lastStates = new Map<string, 'normal' | 'warning' | 'critical'>();
+  private lastStates = new Map<string, MetricStatus>();
+  private warnedAgents = new Map<string, boolean>();
   private allRecovered = new Map<string, boolean>();
   private cooldowns = new Map<string, number>();
 
   constructor(
     private readonly logger: Logger,
     private readonly notificationDispatcher: INotificationDispatcher,
-    private readonly temperatureEvaluator: TemperatureEvaluator,
-    private readonly textFormatter: NotificationTextFormatter,
   ) {}
 
   evaluateAndNotify(data: AgentData, settings: ISettings): void {
@@ -31,125 +52,116 @@ export class NotificationService implements INotificationService {
     }
 
     const { agents, gpus, fetchResult, prevAgentStatus } = data;
-    const hadWarning = new Set<string>();
 
     for (const agent of agents) {
       const gpuList = gpus.get(agent.id);
       if (!gpuList || gpuList.length === 0) {
+        this.processAgentTransition(agent, fetchResult, prevAgentStatus, settings.notifications.cooldowns);
         continue;
       }
-      this.processAgent(agent, gpuList, fetchResult, prevAgentStatus.get(agent.id), hadWarning, settings);
+      this.processAgent(agent, gpuList, fetchResult, prevAgentStatus, settings);
     }
 
-    this.resetRecoveredFlags(hadWarning);
+    this.pruneCooldowns(settings.notifications.cooldowns);
   }
 
   private processAgent(
     agent: IAgent, gpuList: IGpu[], fetchResult: Map<string, FetchResult>,
-    prevAgentStatus: EAgentStatus | undefined,
-    hadWarning: Set<string>, settings: ISettings,
+    prevAgentStatus: Map<string, EAgentStatus>, settings: ISettings,
   ): void {
     const agentId = agent.id;
-    const agentName = agent.name;
-    const prev = this.lastStates.get(agentId) ?? 'normal';
-    const metrics = this.temperatureEvaluator.gatherMetrics(gpuList, settings.thresholds);
+    const metrics = this.gatherMetrics(gpuList, settings.thresholds);
     const cooldowns = settings.notifications.cooldowns;
-    let maxStatus: 'normal' | 'warning' | 'critical' = 'normal';
+    let agentWarned = false;
 
     for (const metric of metrics) {
-      const status = this.temperatureEvaluator.evaluateMetric(metric.temp, metric.warn, metric.critical);
-      maxStatus = this.dispatchMetric(metric, status, prev, agentId, agentName, maxStatus, hadWarning, cooldowns);
+      const status = evaluateStatus(metric.temp, metric.warn, metric.critical);
+      const prev = this.lastStates.get(`${agentId}:${metric.metric}`) ?? 'normal';
+      if (status !== 'normal') {
+        agentWarned = true;
+      }
+      this.dispatchMetric(metric, status, prev, agentId, agent.name, cooldowns);
+      this.lastStates.set(`${agentId}:${metric.metric}`, status);
     }
 
-    this.dispatchAgentTransition(agentId, agentName, agent.status ?? EAgentStatus.Pending, fetchResult.get(agentId) === 'ok', prevAgentStatus, cooldowns);
-    this.lastStates.set(agentId, maxStatus);
-    this.dispatchAllRecovered(agentId, agentName, metrics, hadWarning, cooldowns);
+    this.processAgentTransition(agent, fetchResult, prevAgentStatus, cooldowns);
+    this.dispatchAllRecovered(agent, metrics, agentWarned, cooldowns);
+  }
+
+  private processAgentTransition(
+    agent: IAgent, fetchResult: Map<string, FetchResult>,
+    prevAgentStatus: Map<string, EAgentStatus>, cooldowns: INotificationCooldowns,
+  ): void {
+    const agentStatus = agent.status ?? EAgentStatus.Pending;
+    const prevStatus = prevAgentStatus.get(agent.id);
+    const fetchOk = fetchResult.get(agent.id) === 'ok';
+
+    if (fetchOk && agentStatus === EAgentStatus.Online && prevStatus !== EAgentStatus.Online) {
+      this.fireNotification('agent:online', agent.id, '', agent.name, '', 'normal.png', cooldowns);
+    } else if (!fetchOk && agentStatus === EAgentStatus.Offline && prevStatus !== EAgentStatus.Offline) {
+      this.fireNotification('agent:offline', agent.id, '', agent.name, '', 'critical.png', cooldowns);
+    }
   }
 
   private dispatchMetric(
-    metric: { metric: string, temp: number, warn: number, critical: number },
-    status: 'normal' | 'warning' | 'danger',
-    prev: 'normal' | 'warning' | 'critical',
-    agentId: string, agentName: string, maxStatus: 'normal' | 'warning' | 'critical',
-    hadWarning: Set<string>, cooldowns: INotificationCooldowns,
-  ): 'normal' | 'warning' | 'critical' {
+    metric: TemperatureMetric,
+    status: MetricStatus,
+    prev: MetricStatus,
+    agentId: string, agentName: string,
+    cooldowns: INotificationCooldowns,
+  ): void {
     if (status === 'danger') {
-      return this.handleCritical(metric, agentId, agentName, cooldowns, hadWarning);
-    }
-    if (status === 'warning') {
-      return this.handleWarning(metric, agentId, agentName, maxStatus, cooldowns, hadWarning);
-    }
-    this.handleRecovery(metric, status, prev, agentId, agentName, cooldowns);
-
-    return maxStatus;
-  }
-
-  private handleCritical(
-    metric: { metric: string, temp: number }, agentId: string, agentName: string,
-    cooldowns: INotificationCooldowns, hadWarning: Set<string>,
-  ): 'critical' {
-    hadWarning.add(agentId);
-    this.fireNotification('temp:critical', agentId, metric.metric, agentName, `${String(metric.temp)}°C`, 'critical.png', cooldowns);
-
-    return 'critical';
-  }
-
-  private handleWarning(
-    metric: { metric: string, temp: number }, agentId: string, agentName: string,
-    maxStatus: 'normal' | 'warning' | 'critical', cooldowns: INotificationCooldowns, hadWarning: Set<string>,
-  ): 'normal' | 'warning' | 'critical' {
-    if (maxStatus !== 'critical') {
-      maxStatus = 'warning';
-    }
-    hadWarning.add(agentId);
-    this.fireNotification('temp:warn', agentId, metric.metric, agentName, `${String(metric.temp)}°C`, 'warning.png', cooldowns);
-
-    return maxStatus;
-  }
-
-  private handleRecovery(
-    metric: { metric: string, temp: number, warn: number, critical: number },
-    _status: 'normal', prev: 'normal' | 'warning' | 'critical',
-    agentId: string, agentName: string, cooldowns: INotificationCooldowns,
-  ): void {
-    if (prev === 'normal') {
-      return;
-    }
-    const recovered = prev === 'critical' ? metric.temp < metric.critical : metric.temp < metric.warn;
-    if (recovered) {
-      this.fireNotification('temp:recover', agentId, metric.metric, agentName, `${String(metric.temp)}°C`, 'normal.png', cooldowns);
-    }
-  }
-
-  private dispatchAgentTransition(
-    agentId: string, agentName: string, agentStatus: EAgentStatus, fetchOk: boolean,
-    prevStatus: EAgentStatus | undefined, cooldowns: INotificationCooldowns,
-  ): void {
-    if (fetchOk && agentStatus === EAgentStatus.Online && prevStatus !== EAgentStatus.Online) {
-      this.fireNotification('agent:online', agentId, '', agentName, '', 'normal.png', cooldowns);
-    } else if (!fetchOk && agentStatus === EAgentStatus.Offline) {
-      this.fireNotification('agent:offline', agentId, '', agentName, '', 'critical.png', cooldowns);
+      this.fireNotification('temp:critical', agentId, metric.metric, agentName, `${String(metric.temp)}°C`, 'critical.png', cooldowns);
+    } else if (status === 'warning') {
+      this.fireNotification('temp:warn', agentId, metric.metric, agentName, `${String(metric.temp)}°C`, 'warning.png', cooldowns);
+    } else if (prev !== 'normal') {
+      const recovered = prev === 'danger' ? metric.temp < metric.critical : metric.temp < metric.warn;
+      if (recovered) {
+        this.fireNotification('temp:recover', agentId, metric.metric, agentName, `${String(metric.temp)}°C`, 'normal.png', cooldowns);
+      }
     }
   }
 
   private dispatchAllRecovered(
-    agentId: string, agentName: string,
-    metrics: Array<{ status: 'normal' | 'warning' | 'danger' }>,
-    hadWarning: Set<string>, cooldowns: INotificationCooldowns,
+    agent: IAgent,
+    metrics: TemperatureMetric[],
+    agentWarned: boolean,
+    cooldowns: INotificationCooldowns,
   ): void {
+    const agentId = agent.id;
     const allNormal = metrics.every((m) => m.status === 'normal');
-    if (hadWarning.size > 0 && allNormal && !this.allRecovered.get(agentId)) {
+    const wasWarned = this.warnedAgents.get(agentId) ?? false;
+
+    if (!agentWarned && allNormal && wasWarned && !this.allRecovered.get(agentId)) {
       this.allRecovered.set(agentId, true);
-      this.fireNotification('all:recovered', agentId, '', agentName, '', 'normal.png', cooldowns);
+      this.fireNotification('all:recovered', agentId, '', agent.name, '', 'normal.png', cooldowns);
     }
+
+    this.warnedAgents.set(agentId, agentWarned);
   }
 
-  private resetRecoveredFlags(hadWarning: Set<string>): void {
-    for (const agentId of hadWarning) {
-      if (this.allRecovered.get(agentId)) {
-        this.allRecovered.set(agentId, false);
+  private gatherMetrics(gpuList: IGpu[], thresholds: ITemperatureThresholds): TemperatureMetric[] {
+    const keyMap: Array<{ key: keyof ITemperatureThresholds, tempKey: keyof IGpu }> = [
+      { key: 'core', tempKey: 'coreTemp' },
+      { key: 'junction', tempKey: 'junctionTemp' },
+      { key: 'vram', tempKey: 'vramTemp' },
+    ];
+
+    const metrics: TemperatureMetric[] = [];
+
+    for (const gpu of gpuList) {
+      for (const { key, tempKey } of keyMap) {
+        metrics.push({
+          metric: key,
+          temp: gpu[tempKey] as number,
+          warn: thresholds[key].warn,
+          critical: thresholds[key].critical,
+          status: evaluateStatus(gpu[tempKey] as number, thresholds[key].warn, thresholds[key].critical),
+        });
       }
     }
+
+    return metrics;
   }
 
   private fireNotification(
@@ -165,10 +177,54 @@ export class NotificationService implements INotificationService {
     }
     this.cooldowns.set(cooldownKey, now);
 
-    const title = this.textFormatter.buildNotificationTitle(type, agentName, metric);
-    const body = this.textFormatter.buildNotificationBody(type, agentName, metric);
+    const title = this.buildNotificationTitle(type, agentName, metric);
+    const body = this.buildNotificationBody(type, agentName, metric);
 
     this.notificationDispatcher.show({ title, body, icon, silent: false });
     this.logger.info({ type, agentId, metric, value }, `Notification fired: ${title}`);
+  }
+
+  private buildNotificationTitle(type: NotificationType, agentName: string, metric: string): string {
+    const metricLabel = metric ? ` — ${metric.charAt(0).toUpperCase() + metric.slice(1)}` : '';
+    const titles: Record<NotificationType, string> = {
+      'temp:critical': `GPU Temperature Critical${metricLabel} — ${agentName}`,
+      'temp:warn': `GPU Temperature Warning${metricLabel} — ${agentName}`,
+      'temp:recover': `GPU Temperature Recovered${metricLabel} — ${agentName}`,
+      'agent:offline': `Agent Offline — ${agentName}`,
+      'agent:online': `Agent Online — ${agentName}`,
+      'all:recovered': `All GPUs Recovered — ${agentName}`,
+    };
+
+    return titles[type];
+  }
+
+  private buildNotificationBody(type: NotificationType, agentName: string, metric: string): string {
+    const bodies: Record<NotificationType, string> = {
+      'temp:critical': `${metric} temperature exceeded critical threshold on ${agentName}.`,
+      'temp:warn': `${metric} temperature exceeded warning threshold on ${agentName}.`,
+      'temp:recover': `${metric} temperature returned to normal on ${agentName}.`,
+      'agent:offline': `Agent ${agentName} is not responding.`,
+      'agent:online': `Agent ${agentName} is back online.`,
+      'all:recovered': `All GPU temperatures on ${agentName} are within normal range.`,
+    };
+
+    return bodies[type];
+  }
+
+  private pruneCooldowns(cooldowns: INotificationCooldowns): void {
+    const maxCooldown = Math.max(
+      cooldowns.tempCritical,
+      cooldowns.tempWarn,
+      cooldowns.tempRecover,
+      cooldowns.agentOffline,
+      cooldowns.agentOnline,
+      cooldowns.allRecovered,
+    );
+    const now = Date.now();
+    for (const [key, timestamp] of this.cooldowns) {
+      if (now - timestamp > maxCooldown) {
+        this.cooldowns.delete(key);
+      }
+    }
   }
 }

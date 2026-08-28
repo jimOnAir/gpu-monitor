@@ -4,11 +4,11 @@ import type { Menu as ElectronMenu, MenuItemConstructorOptions } from 'electron'
 import type { IMenuFactory } from '../../domains/menu/IMenuFactory';
 
 export class ElectronMenuFactory implements IMenuFactory {
-  buildFromTemplate(template: MenuItemConstructorOptions[]): ElectronMenu {
-    return Menu.buildFromTemplate(template);
+  buildFromTemplate(template: unknown): unknown {
+    return Menu.buildFromTemplate(template as MenuItemConstructorOptions[]);
   }
 
-  setApplicationMenu(menu: ElectronMenu | null): void {
-    Menu.setApplicationMenu(menu);
+  setApplicationMenu(menu: unknown): void {
+    Menu.setApplicationMenu(menu as ElectronMenu | null);
   }
 }

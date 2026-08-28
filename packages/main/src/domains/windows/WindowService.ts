@@ -1,78 +1,123 @@
-import { EIPC } from '@gpu-monitor/shared';
 import type { ISettings } from '@gpu-monitor/shared';
-import type { BrowserWindow } from 'electron';
-import * as path from 'path';
 
 import type { Logger } from '../../logger';
 import type { AgentData } from '../polling/AgentData';
 
 import type { IThemeListener, ThemeColor } from './IThemeListener';
 import type { IWindowFactory } from './IWindowFactory';
+import type { IWindowHandle } from './IWindowHandle';
 import type { IWindowService } from './IWindowService';
 import type { IWindowStatePersister } from './IWindowStatePersister';
 import type { NavigationSecurityService } from './NavigationSecurityService';
 
-export type BuildIconFn = () => Electron.NativeImage;
+export interface WindowDefaults {
+  main: { width: number, height: number };
+  preferences: { width: number, height: number };
+}
 
 export class WindowService implements IWindowService {
-  private mainWindow: BrowserWindow | null = null;
-  private preferencesWindow: BrowserWindow | null = null;
-  private currentPersister: IWindowStatePersister | null = null;
-  private currentPersisterSave: ((window: BrowserWindow) => void) | null = null;
+  private mainWindow: IWindowHandle | null = null;
+  private preferencesWindow: IWindowHandle | null = null;
   private willQuit = false;
 
   constructor(
     private readonly logger: Logger,
     private readonly windowFactory: IWindowFactory,
-    private readonly buildIcon: BuildIconFn,
+    private readonly buildIcon: () => unknown,
     private readonly navigationSecurity: NavigationSecurityService,
     private readonly themeListener: IThemeListener,
     private readonly mainWindowStatePersister: IWindowStatePersister,
     private readonly preferencesWindowStatePersister: IWindowStatePersister,
     private readonly projectRoot: string,
+    private readonly windowDefaults: WindowDefaults,
   ) {}
 
-  createMainWindow(settings: ISettings, _tray: Electron.Tray | null): void {
+  createMainWindow(settings: ISettings): void {
     const mainWindowState = this.mainWindowStatePersister.load();
+    const trustedOrigins = this.navigationSecurity.buildTrustedOrigins(settings.agents);
 
-    const icon = this.buildIcon();
     this.mainWindow = this.windowFactory.create({
       x: mainWindowState.x,
       y: mainWindowState.y,
-      width: mainWindowState.width,
-      height: mainWindowState.height,
+      width: mainWindowState.width ?? this.windowDefaults.main.width,
+      height: mainWindowState.height ?? this.windowDefaults.main.height,
       minWidth: 520,
       minHeight: 400,
-      icon,
-    });
-    this.currentPersister = this.mainWindowStatePersister;
-    this.mainWindowStatePersister.save(this.mainWindow);
-    this.currentPersisterSave = this.mainWindowStatePersister.save.bind(this.mainWindowStatePersister);
+      icon: this.buildIcon(),
+      loadFile: `${this.projectRoot}/packages/renderer/dist/index.html`,
+      onReadyToShow: () => {
+        this.mainWindow?.show();
+      },
+      onFocus: () => {
+        this.mainWindow?.send('WINDOW_FOCUS');
+      },
+      onBlur: () => {
+        this.mainWindow?.send('WINDOW_BLUR');
+      },
+      onClose: (event) => {
+        // Save position before hiding — the persister only auto-saves on real close,
+        // but we preventDefault to hide instead of close, so we save manually.
+        this.mainWindowStatePersister.save(this.mainWindow as IWindowHandle);
+        event.preventDefault();
+        if (this.willQuit) {
+          this.mainWindow = null;
 
-    this.mainWindow.loadFile(path.join(this.projectRoot, 'packages/renderer/dist/index.html'));
+          return;
+        }
+        this.mainWindow?.hide();
+      },
+      onWillNavigate: (event, url) => {
+        if (!this.navigationSecurity.isTrustedUrl(url, trustedOrigins)) {
+          event.preventDefault();
+          this.navigationSecurity.handleNavigation(url, trustedOrigins);
+        }
+      },
+      onWindowOpen: (url) => {
+        if (this.navigationSecurity.isTrustedUrl(url, trustedOrigins)) {
+          return 'allow';
+        }
+        this.navigationSecurity.handleNavigation(url, trustedOrigins);
 
-    const trustedOrigins = this.buildTrustedOrigins(settings);
-    this.mainWindow.webContents.on('will-navigate', (event, url) => {
-      this.handleNavigation(event, url, trustedOrigins);
-    });
-    this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-      return this.handleWindowOpen(url, trustedOrigins);
+        return 'deny';
+      },
     });
 
-    this.setupWindowEvents(this.mainWindow, () => {
-      if (this.willQuit) {
-        this.mainWindow = null;
-
-        return;
-      }
-      this.mainWindow?.hide();
+    this.themeListener.subscribe((color: ThemeColor) => {
+      // Background color is applied at creation; live theme changes are a no-op
+      // for the main window (documented limitation of the current factory).
+      void color;
     });
+
+    this.logger.info('Main window created');
+  }
+
+  showMainWindow(): void {
+    this.mainWindow?.show();
+  }
+
+  hideMainWindow(): void {
+    this.mainWindow?.hide();
+  }
+
+  getMainWindow(): IWindowHandle | null {
+    return this.mainWindow;
+  }
+
+  ensureMainWindow(settings: ISettings): void {
+    if (this.mainWindow) {
+      this.mainWindow.show();
+      this.mainWindow.focus();
+
+      return;
+    }
+    this.createMainWindow(settings);
   }
 
   togglePreferencesWindow(): void {
     if (this.preferencesWindow) {
       if (this.preferencesWindow.isVisible()) {
         this.preferencesWindow.hide();
+        this.preferencesWindow = null;
       } else {
         this.preferencesWindow.show();
         this.preferencesWindow.focus();
@@ -81,47 +126,15 @@ export class WindowService implements IWindowService {
       return;
     }
 
-    this.createPreferencesWindow(this.mainWindow);
+    this.createPreferencesWindow();
   }
 
-  createPreferencesWindow(parent: BrowserWindow | null): void {
-    if (this.preferencesWindow) {
-      if (this.preferencesWindow.isVisible()) {
-        this.preferencesWindow.focus();
-      } else {
-        this.preferencesWindow.show();
-      }
-
-      return;
-    }
-
-    const preferencesWindowState = this.preferencesWindowStatePersister.load();
-
-    this.preferencesWindow = this.windowFactory.create({
-      x: preferencesWindowState.x,
-      y: preferencesWindowState.y,
-      width: preferencesWindowState.width,
-      height: preferencesWindowState.height,
-      minWidth: 480,
-      minHeight: 400,
-      parent: parent ?? undefined,
-      hasShadow: true,
-      roundedCorners: true,
-      titleBarStyle: 'hidden',
-    });
-    this.currentPersister = this.preferencesWindowStatePersister;
-    this.preferencesWindowStatePersister.save(this.preferencesWindow);
-    this.currentPersisterSave = this.preferencesWindowStatePersister.save.bind(this.preferencesWindowStatePersister);
-
-    this.preferencesWindow.loadFile(path.join(this.projectRoot, 'packages/renderer/dist/settings.html'));
-
-    this.setupWindowEvents(this.preferencesWindow, () => {
-      this.preferencesWindow = null;
-    });
+  setWillQuit(value: boolean): void {
+    this.willQuit = value;
   }
 
   pushToRenderer(data: AgentData): void {
-    this.mainWindow?.webContents.send(EIPC.GPU_DATA_UPDATE, {
+    this.mainWindow?.send('GPU_DATA_UPDATE', {
       agents: data.agents,
       gpus: Array.from(data.gpus.entries()).map(([id, gpus]) => ({ agentId: id, gpus })),
       lastUpdate: Array.from(data.lastUpdate.entries()),
@@ -131,67 +144,41 @@ export class WindowService implements IWindowService {
     });
   }
 
-  buildTrustedOrigins(settings: ISettings): Set<string> {
-    return this.navigationSecurity.buildTrustedOrigins(settings.agents);
-  }
+  private createPreferencesWindow(): void {
+    const preferencesWindowState = this.preferencesWindowStatePersister.load();
 
-  getMainWindow(): BrowserWindow | null {
-    return this.mainWindow;
-  }
-
-  getPreferencesWindow(): BrowserWindow | null {
-    return this.preferencesWindow;
-  }
-
-  setPreferencesWindow(win: BrowserWindow | null): void {
-    this.preferencesWindow = win;
-  }
-
-  setWillQuit(value: boolean): void {
-    this.willQuit = value;
-  }
-
-  private handleNavigation(event: { preventDefault: () => void }, url: string, trustedOrigins: Set<string>): void {
-    if (!this.navigationSecurity.isTrustedUrl(url, trustedOrigins)) {
-      event.preventDefault();
-      this.navigationSecurity.handleNavigation(url, trustedOrigins);
-    }
-  }
-
-  private handleWindowOpen(url: string, trustedOrigins: Set<string>): { action: 'deny' | 'allow' } {
-    if (this.navigationSecurity.isTrustedUrl(url, trustedOrigins)) {
-      return { action: 'allow' };
-    }
-    this.navigationSecurity.handleNavigation(url, trustedOrigins);
-
-    return { action: 'deny' };
-  }
-
-  private setupWindowEvents(win: BrowserWindow, onClose: () => void): void {
-    this.themeListener.subscribe((color: ThemeColor) => {
-      win.setBackgroundColor(color);
+    this.preferencesWindow = this.windowFactory.create({
+      x: preferencesWindowState.x,
+      y: preferencesWindowState.y,
+      width: preferencesWindowState.width ?? this.windowDefaults.preferences.width,
+      height: preferencesWindowState.height ?? this.windowDefaults.preferences.height,
+      minWidth: 480,
+      minHeight: 400,
+      parent: this.mainWindow,
+      hasShadow: true,
+      roundedCorners: true,
+      titleBarStyle: 'hidden',
+      loadFile: `${this.projectRoot}/packages/renderer/dist/settings.html`,
+      onReadyToShow: () => {
+        this.preferencesWindow?.show();
+      },
+      onFocus: () => {
+        this.preferencesWindow?.send('WINDOW_FOCUS');
+      },
+      onBlur: () => {
+        this.preferencesWindow?.send('WINDOW_BLUR');
+      },
+      onClose: (event) => {
+        this.preferencesWindowStatePersister.save(this.preferencesWindow as IWindowHandle);
+        event.preventDefault();
+        this.preferencesWindow = null;
+      },
+      onWillNavigate: (event) => {
+        event.preventDefault();
+      },
+      onWindowOpen: () => 'deny',
     });
-    win.once('ready-to-show', () => {
-      win.show();
-    });
-    // Note: ready-to-show only fires when win.show() is called.
-    // Windows created with show: false (preferences) won't fire it.
-    // The main window is shown via tray callback, so no force-show needed.
-    win.on('focus', () => {
-      win.webContents.send(EIPC.WINDOW_FOCUS);
-    });
-    win.on('blur', () => {
-      win.webContents.send(EIPC.WINDOW_BLUR);
-    });
-    win.on('close', (event) => {
-      // Save position before hiding — electron-window-state only auto-saves on 'close',
-      // but we preventDefault to hide instead of close, so we must save manually.
-      if (this.currentPersisterSave) {
-        this.currentPersisterSave(win);
-      }
-      event.preventDefault();
-      onClose();
-    });
-    win.on('closed', () => { /* handled by caller */ });
+
+    this.logger.info('Preferences window created');
   }
 }

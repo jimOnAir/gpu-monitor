@@ -1,6 +1,4 @@
-import type { NativeImage } from 'electron';
-
 export interface IIconLoader {
-  loadIcon: (name: string) => NativeImage;
-  loadBuildIcon: (resize?: boolean) => NativeImage;
+  loadIcon: (name: string) => unknown;
+  loadBuildIcon: (resize?: boolean) => unknown;
 }

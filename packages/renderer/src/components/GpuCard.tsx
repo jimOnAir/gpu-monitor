@@ -1,18 +1,19 @@
-import type { IGpu } from '@gpu-monitor/shared';
+import { evaluateStatus, type IGpu, type ISettings, type MetricStatus } from '@gpu-monitor/shared';
 import React from 'react';
 
 import { getGpuUtilizationStatus, getMemoryStatus, getPowerStatus, GB } from '../utils/constants';
+import { formatValue } from '../utils/statusDisplay';
 
 import { GpuBar } from './GpuBar';
 
 interface GpuCardProps {
   gpu: IGpu;
   index: number;
-  agentName: string;
+  settings: ISettings;
   onClick?: () => void;
 }
 
-export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName: _agentName, onClick }) => {
+export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, settings, onClick }) => {
   return (
     <div
       className={`gpu-card${onClick ? ' gpu-card-clickable' : ''}`}
@@ -43,9 +44,9 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, agentName: _agentN
 
       {/* Temperature Section */}
       <div className="gpu-card-section">
-        <GpuRow label="Core" value={gpu.coreTemp} max={100} unit="°C" status={gpu.coreStatus ?? 'normal'} />
-        <GpuRow label="Junction" value={gpu.junctionTemp} max={100} unit="°C" status={gpu.junctionStatus ?? 'normal'} />
-        <GpuRow label="VRAM" value={gpu.vramTemp} max={100} unit="°C" status={gpu.vramStatus ?? 'normal'} />
+        <GpuRow label="Core" value={gpu.coreTemp} max={100} unit="°C" status={evaluateStatus(gpu.coreTemp, settings.thresholds.core.warn, settings.thresholds.core.critical)} />
+        <GpuRow label="Junction" value={gpu.junctionTemp} max={100} unit="°C" status={evaluateStatus(gpu.junctionTemp, settings.thresholds.junction.warn, settings.thresholds.junction.critical)} />
+        <GpuRow label="VRAM" value={gpu.vramTemp} max={100} unit="°C" status={evaluateStatus(gpu.vramTemp, settings.thresholds.vram.warn, settings.thresholds.vram.critical)} />
       </div>
 
       {/* Separator */}
@@ -88,7 +89,7 @@ interface GpuRowProps {
   value: number;
   max: number;
   unit: string;
-  status: 'normal' | 'warning' | 'danger';
+  status: MetricStatus;
   showDetail?: boolean;
 }
 
@@ -107,17 +108,3 @@ const GpuRow: React.FC<GpuRowProps> = ({ label, value, max, unit, status, showDe
     <span className="gpu-row-value">{formatValue(value, max, unit, showDetail)}</span>
   </div>
 );
-
-export function formatValue(value: number, max: number, unit: string, showDetail?: boolean): string {
-  if (showDetail) {
-    return `${value.toFixed(0)}/${max.toFixed(0)}${unit}`;
-  }
-  if (unit === 'W') {
-    return `${value.toFixed(0)}W`;
-  }
-  if (unit === 'B') {
-    return `${(value / GB).toFixed(0)}GB`;
-  }
-
-  return `${Math.round(value)}${unit}`;
-}

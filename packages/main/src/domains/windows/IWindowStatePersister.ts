@@ -1,4 +1,4 @@
-import type { BrowserWindow } from 'electron';
+import type { IWindowHandle } from './IWindowHandle';
 
 export interface IWindowState {
   x?: number;
@@ -9,5 +9,5 @@ export interface IWindowState {
 
 export interface IWindowStatePersister {
   load: () => IWindowState;
-  save: (window: BrowserWindow) => void;
+  save: (window: IWindowHandle) => void;
 }

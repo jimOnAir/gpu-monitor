@@ -1,28 +1,30 @@
-import { DEFAULT_SETTINGS, EAgentStatus, type IAgent, type ISettings } from '@gpu-monitor/shared';
+import { EAgentStatus, type IAgent, type ISettings } from '@gpu-monitor/shared';
 import type { AgentData } from '@gpu-monitor/shared';
 
 import type { Logger } from '../../logger';
-import type { INotificationService } from '../notifications/INotificationService';
-import type { ISettingsRepository } from '../settings/ISettingsService';
-import type { ITrayService } from '../tray/ITrayService';
-import type { IWindowService } from '../windows/IWindowService';
 
 import type { PollingHandlers } from './AgentData';
 import type { AgentPoller } from './AgentPoller';
-import type { IHttpAdapter } from './IHttpAdapter';
 import type { IPollingService } from './IPollingService';
 import type { StaleDetector } from './StaleDetector';
 import { STALE_CHECK_INTERVAL_MS } from './StaleDetector';
 
+const FETCH_ERROR_MESSAGES: Record<string, string> = {
+  'fetch-failed': 'Failed to fetch /gpu',
+  'health-failed': 'Agent /health not ok',
+  invalid: 'GPU data failed validation',
+};
+
 /**
- * Orchestrates agent polling: manages HTTP fetch lifecycle, stale detection intervals,
- * and delegates data classification to AgentPoller and stale checks to StaleDetector.
+ * Orchestrates agent polling: owns the active settings and the poll cycle
+ * (fetch → classify → stale → notify → tray → push).
+ * All entry points (interval, stale check, manual refresh) run the same cycle.
  */
 export class PollingService implements IPollingService {
   private pollingInterval: ReturnType<typeof setInterval> | null = null;
   private staleCheckInterval: ReturnType<typeof setInterval> | null = null;
   private handlers: PollingHandlers | null = null;
-  private currentSettings: ISettings = DEFAULT_SETTINGS;
+  private activeSettings: ISettings | null = null;
   private agentData: AgentData = {
     agents: [],
     gpus: new Map(),
@@ -35,13 +37,9 @@ export class PollingService implements IPollingService {
 
   constructor(
     private readonly logger: Logger,
-    private readonly httpAdapter: IHttpAdapter,
-    private readonly settingsRepository: ISettingsRepository,
-    private readonly notificationService: INotificationService,
-    private readonly trayService: ITrayService,
-    private readonly windowService: IWindowService,
     private readonly agentPoller: AgentPoller,
     private readonly staleDetector: StaleDetector,
+    private readonly handlersProvider: () => PollingHandlers | null,
   ) {}
 
   getAgentData(): AgentData {
@@ -53,11 +51,8 @@ export class PollingService implements IPollingService {
   }
 
   startPolling(settings: ISettings): void {
-    if (!this.handlers) {
-      throw new Error('Polling handlers not initialized');
-    }
     this.stopPolling();
-    this.currentSettings = settings;
+    this.activeSettings = settings;
 
     this.agentData = {
       agents: settings.agents.map((a) => ({ ...a, status: EAgentStatus.Pending })),
@@ -69,30 +64,20 @@ export class PollingService implements IPollingService {
       prevAgentStatus: new Map(),
     };
 
-    const cb = this.handlers;
-    cb.pushToRenderer();
-    void this.refreshAllAgents().then(() => {
-      this.checkStale();
-      cb.evaluateAndNotify(this.agentData, settings);
-      cb.updateTrayFromData();
-      cb.pushToRenderer();
-    });
+    void this.runCycle();
 
     this.pollingInterval = setInterval(() => {
-      void this.refreshAllAgents().then(() => {
-        this.checkStale();
-        cb.evaluateAndNotify(this.agentData, settings);
-        cb.updateTrayFromData();
-        cb.pushToRenderer();
-        this.logger.info('polling interval callback executed');
-      }).catch((error: unknown) => {
+      void this.runCycle().catch((error: unknown) => {
         this.logger.error({ error: String(error) }, 'polling interval callback failed');
       });
     }, settings.refreshInterval);
 
     this.staleCheckInterval = setInterval(() => {
-      this.checkStale();
-      cb.pushToRenderer();
+      try {
+        this.runStaleCheck();
+      } catch (error) {
+        this.logger.error({ error: String(error) }, 'stale check callback failed');
+      }
     }, STALE_CHECK_INTERVAL_MS);
   }
 
@@ -105,7 +90,30 @@ export class PollingService implements IPollingService {
     }
   }
 
-  async refreshAllAgents(): Promise<void> {
+  /**
+   * Run one full poll cycle. Used by the poll interval, the stale-check
+   * interval, and manual refresh (tray menu / settings save).
+   */
+  async refreshAgents(): Promise<void> {
+    await this.runCycle();
+  }
+
+  private async runCycle(): Promise<void> {
+    const handlers = this.handlers ?? this.handlersProvider();
+    const settings = this.activeSettings;
+    if (!handlers || !settings) {
+      return;
+    }
+
+    await this.refreshAllAgents();
+    this.checkStale();
+    handlers.evaluateAndNotify(this.agentData, settings);
+    handlers.updateTrayFromData();
+    handlers.pushToRenderer();
+    this.logger.info('polling cycle executed');
+  }
+
+  private async refreshAllAgents(): Promise<void> {
     // Snapshot current status before polling so transitions can be detected
     for (const agent of this.agentData.agents) {
       this.agentData.prevAgentStatus.set(agent.id, agent.status ?? EAgentStatus.Pending);
@@ -133,8 +141,7 @@ export class PollingService implements IPollingService {
       this.agentData.statusChangedAt.set(agent.id, Date.now());
       this.setAgentStatus(agent.id, EAgentStatus.Online, undefined);
     } else {
-      const error = classified.status === 'fetch-failed' ? 'Failed to fetch /gpu' : undefined;
-      this.setAgentStatus(agent.id, EAgentStatus.Offline, error);
+      this.setAgentStatus(agent.id, EAgentStatus.Offline, FETCH_ERROR_MESSAGES[classified.status]);
     }
   }
 
@@ -152,5 +159,18 @@ export class PollingService implements IPollingService {
 
   private checkStale(): void {
     this.staleDetector.checkStale(this.agentData.agents, this.agentData.lastUpdate);
+  }
+
+  private runStaleCheck(): void {
+    const handlers = this.handlers ?? this.handlersProvider();
+    const settings = this.activeSettings;
+    if (!handlers || !settings) {
+      return;
+    }
+
+    this.checkStale();
+    handlers.evaluateAndNotify(this.agentData, settings);
+    handlers.updateTrayFromData();
+    handlers.pushToRenderer();
   }
 }
