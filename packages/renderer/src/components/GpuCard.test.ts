@@ -21,6 +21,11 @@ describe('formatValue', () => {
     expect(formatValue(95, 100, '%')).toBe('95%');
   });
 
+  it('shows -- for unavailable (null) sensors', () => {
+    expect(formatValue(null, 100, '°C')).toBe('--');
+    expect(formatValue(null, 1000, 'W', true)).toBe('--');
+  });
+
   it('shows MB format for byte units with detail', () => {
     expect(formatValue(500, 1000, 'B', true)).toBe('500/1000B');
   });

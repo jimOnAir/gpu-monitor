@@ -86,7 +86,8 @@ export const GpuCard: React.FC<GpuCardProps> = ({ gpu, index, settings, onClick 
 
 interface GpuRowProps {
   label: string;
-  value: number;
+  /** null = sensor unavailable */
+  value: number | null;
   max: number;
   unit: string;
   status: MetricStatus;

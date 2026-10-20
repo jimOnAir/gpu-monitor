@@ -314,4 +314,26 @@ describe('NotificationService', () => {
       expect(allRecovered[0].title).toContain('a1');
     });
   });
+
+  describe('unavailable (null) sensors', () => {
+    it('does not evaluate or notify for null temps', () => {
+      const data = buildData();
+      data.gpus.set('test', [buildGpu(0, { junctionTemp: null, vramTemp: null })]);
+
+      service.evaluateAndNotify(data, settings);
+      expect(mockNotifications.filter((n) => n.title.includes('Junction') || n.title.includes('VRAM'))).toHaveLength(0);
+    });
+
+    it('does not fire recovery notification when a critical sensor becomes unavailable', () => {
+      const data = buildData();
+      data.gpus.set('test', [buildGpu(0, { junctionTemp: 97 })]);
+      service.evaluateAndNotify(data, settings);
+      expect(mockNotifications.filter((n) => n.title.includes('Junction'))).toHaveLength(1);
+
+      resetMock();
+      data.gpus.set('test', [buildGpu(0, { junctionTemp: null })]);
+      service.evaluateAndNotify(data, settings);
+      expect(mockNotifications.filter((n) => n.title.includes('Junction'))).toHaveLength(0);
+    });
+  });
 });

@@ -8,8 +8,10 @@ export interface IGpu {
   name: string;
   uuid: string;
   coreTemp: number;
-  junctionTemp: number;
-  vramTemp: number;
+  /** null when the sensor is unavailable (e.g. read failed on this architecture) */
+  junctionTemp: number | null;
+  /** null when the sensor is unavailable (e.g. read failed on this architecture) */
+  vramTemp: number | null;
   gpuUtilization: number;
   memoryUsed: number;
   memoryTotal: number;

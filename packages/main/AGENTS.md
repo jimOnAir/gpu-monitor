@@ -88,12 +88,12 @@ src/
 - Preload script (`preload.ts`) exposes safe IPC bridges to the renderer — types come from `@gpu-monitor/shared` (`IElectronAPI`)
 - Logger in `logger.ts` handles main-process logging
 - **Settings validation**: Zod schema in `settings.ts` — `parseSettings()` for runtime validation; agent URLs validated via `agentUrlSchema` (http/https only, rejects `file://`)
-- **GPU data validation**: Zod schemas in `gpu-validation.ts` — validates raw agent responses before processing (`validateGpuResponse()`)
+- **GPU data validation**: Zod schemas in `gpu-validation.ts` — validates raw agent responses before processing (`validateGpuResponse()`); `junctionTemp`/`vramTemp` accept `number | null`
 - **Agent polling**: `PollingService` owns the active settings and the poll cycle (`runCycle`: fetch → classify → stale → notify → tray → push). All entry points (poll interval, stale-check interval, `refreshAgents()`) run the same cycle. `AgentPoller` fetches `/gpu` + `/health` in parallel (timeout enforced by `IHttpAdapter`); `classifyResult()` → `validateGpuResponse()` pipeline classifies as `ok` / `fetch-failed` / `health-failed` / `invalid`
 - **Stale detection**: runs every 5s as part of the poll cycle, independent of the polling interval
-- **NotificationService**: self-contained (constructor: logger + dispatcher) — evaluates per-GPU temperature thresholds via shared `evaluateStatus()`, tracks per-metric previous state (`agentId:metric` keys), per-agent warned flags, and per-trigger cooldowns; fires through `INotificationDispatcher` adapter
+- **NotificationService**: self-contained (constructor: logger + dispatcher) — evaluates per-GPU temperature thresholds via shared `evaluateStatus()`, tracks per-metric previous state (`agentId:metric` keys), per-agent warned flags, and per-trigger cooldowns; fires through `INotificationDispatcher` adapter. Metrics with `null` temperature (sensor unavailable) are skipped entirely — no notification, no recovery, previous state retained
 - **Threshold evaluation**: single source of truth is `evaluateStatus()` / `worstStatus()` in `@gpu-monitor/shared` — consumed by tray, notifications, and renderer. One label vocabulary: `normal | warning | danger`
-- Tray icon and tooltip update are internal to main process (no IPC needed); tray uses per-metric evaluation via shared `evaluateStatus()` so junction/vram critical temps override core-only normal state
+- Tray icon and tooltip update are internal to main process (no IPC needed); tray uses per-metric evaluation via shared `evaluateStatus()` so junction/vram critical temps override core-only normal state; null temps render `--` in the tooltip and never escalate the icon
 - **Window/tray handles**: `IWindowHandle` and `ITrayHandle` are domain abstractions — `IWindowService` and `ITrayService` contain no electron types; the Electron adapters wrap `BrowserWindow`/`Tray` to satisfy them
 - **No module-level singletons** — tray, windows, and polling state are instance fields on their services
 - **No callback injection anti-pattern** — `setPollingCallbacks()` is replaced by `PollingService.registerHandlers()` with typed interface

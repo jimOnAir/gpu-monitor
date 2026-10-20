@@ -1,10 +1,10 @@
 CC = gcc
 CFLAGS = -O2 -Wall -Wextra -I/usr/include -I/opt/cuda/include
-LDFLAGS = -lnvidia-ml -lpci -lmicrohttpd
+LDFLAGS = -lnvidia-ml -lpci -lmicrohttpd -ldl -lpthread
 
 TARGET = gputempd
 
-SRCS = main.c gpu.c gpu_identity.c logger.c
+SRCS = main.c gpu.c gpu_identity.c logger.c nvapi_temps.c
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean install

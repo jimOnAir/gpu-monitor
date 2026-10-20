@@ -17,7 +17,7 @@ React-based GPU monitoring dashboard. Displays clickable GPU cards with temp/uti
 - `types/AgentState.ts` — `AgentState` is derived from shared `AgentData` (`Omit<AgentData, 'prevAgentStatus'>`); no hand-copied type
 - **Display vocabulary** in `utils/statusDisplay.ts` — `getAgentStatusLabel`, `getStatusColor`, `formatValue`; single copy, imported by all components
 - **Threshold helpers** in `utils/constants.ts` — `GB`, `getMemoryStatus`, `getPowerStatus`, `getGpuUtilizationStatus` (return shared `MetricStatus`); threshold values are internal to the module
-- **Temperature status** is computed via shared `evaluateStatus(temp, warn, critical)` against `settings.thresholds` — the C agent no longer sends `coreStatus`/`junctionStatus`/`vramStatus`; user-configured thresholds drive UI colors
+- **Temperature status** is computed via shared `evaluateStatus(temp, warn, critical)` against `settings.thresholds` — the C agent no longer sends `coreStatus`/`junctionStatus`/`vramStatus`; user-configured thresholds drive UI colors. `junctionTemp`/`vramTemp` can be `null` (sensor unavailable) — `GpuBar`/`formatValue` render `--`, bars render empty
 - App uses `GpuDataPayload` (from `@gpu-monitor/shared`) for the IPC payload type directly
 
 ## Work Guidance

@@ -9,8 +9,8 @@ echo "=== Deploying gputempd to ${REMOTE} ==="
 
 # 1. Build source tarball
 tar -czf /tmp/gpu-monitor-agent.tar.gz \
-  -C "${SCRIPT_DIR}/.." \
-  gpu.c gpu.h main.c Makefile gputempd.service
+  -C "$SCRIPT_DIR" \
+  gpu.c gpu.h gpu_identity.c gpu_identity.h main.c logger.c logger.h nvapi_temps.c nvapi_temps.h Makefile gputempd.service
 
 # 2. Copy to remote
 scp /tmp/gpu-monitor-agent.tar.gz "${USER}@${REMOTE}:/tmp/"

@@ -33,7 +33,10 @@ export function getStatusColor(status: MetricStatus): string {
   }
 }
 
-export function formatValue(value: number, max: number, unit: string, showDetail?: boolean): string {
+export function formatValue(value: number | null, max: number, unit: string, showDetail?: boolean): string {
+  if (value === null) {
+    return '--';
+  }
   if (showDetail) {
     return `${value.toFixed(0)}/${max.toFixed(0)}${unit}`;
   }

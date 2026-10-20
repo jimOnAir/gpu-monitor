@@ -12,7 +12,8 @@ Production C daemon that reads GPU temperatures via NVML and /dev/mem mmap (for 
 - JSON response buffer scales dynamically: `(1 + (gpu_count + 7) / 8) * BUFFER_SIZE`
 - CORS is wildcard (`*`) in production code (`main.c:179`)
 - **JSON string fields escaped** via `json_escape_string()` — all string values (name, uuid, vendor, model, etc.) go through this helper before `snprintf` to prevent malformed JSON from special characters
-- Junction/VRAM temps require `iomem=relaxed` kernel parameter — see `agent/README.md`
+- **Junction/VRAM sensor source**: NVAPI first (`nvapi_temps.c/h` — therm channels + Blackwell hotspot register `0xad0aa0`, ported from LACT), legacy `/dev/mem` BAR0 fallback for pre-NVAPI setups (`iomem=relaxed` required there, dead on Blackwell). Unavailable sensors emit JSON `null` (`junctionTempValid`/`vramTempValid` gate the output). Blackwell hotspot register op requires root; NVAPI calls are mutex-serialized (MHD thread-per-connection)
+- **NVAPI ABI is pinned with `_Static_assert`s** in `nvapi_temps.c` — if the struct layouts drift on a driver bump, the build fails instead of silently reading wrong bytes; re-check against LACT's `nvapi.rs` when that happens
 - Power readings are in milliwatts, converted to watts at `gpu.c:108`
 - Logger subsystem in `logger.c/h` handles all logging
 - `--help` / `-h` flag prints usage and exits before daemon startup

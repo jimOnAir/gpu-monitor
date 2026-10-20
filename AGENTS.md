@@ -72,7 +72,7 @@ When the user requests a durable behavior change, record it here or in the relev
 
 ## Stack & Boundaries
 
-- **C agent** (`agent/`) — standalone daemon, builds with `make`, no Node deps. HTTP server (microhttpd) reading NVML + `/dev/mem`. Built on remote servers, not here.
+- **C agent** (`agent/`) — standalone daemon, builds with `make`, no Node deps. HTTP server (microhttpd) reading NVML + NVAPI (junction/VRAM; `/dev/mem` BAR0 legacy fallback). Built on remote servers, not here.
 - **Electron app** — three TypeScript packages under `packages/`:
   - `@gpu-monitor/shared` — **types + enums only**, no implementation. Consumed by both main and renderer.
   - `@gpu-monitor/main` — Electron main process. esbuild-bundled to `dist/electron-app/`.
@@ -103,10 +103,10 @@ npm run package                      # build + electron-builder --linux AppImage
 ## Architecture Notes
 
 - **Domain/adapter pattern in main**: `domains/` has no Electron imports. `infrastructure/electron/` adapters bridge to `electron` module. `AppBootstrap` is the composition root (wiring only — no behavior). Domain interfaces never expose electron types: `IWindowHandle` / `ITrayHandle` are the domain abstractions.
-- **Threshold evaluation**: single source of truth is `evaluateStatus()` / `worstStatus()` in `@gpu-monitor/shared` — consumed by tray, notifications, and renderer. One label vocabulary: `normal | warning | danger`. The C agent reports raw temperatures only.
+- **Threshold evaluation**: single source of truth is `evaluateStatus()` / `worstStatus()` in `@gpu-monitor/shared` — consumed by tray, notifications, and renderer. One label vocabulary: `normal | warning | danger`. The C agent reports raw temperatures only; junction/vram may be `null` when a sensor is unavailable (Blackwell hotspot needs root) — `evaluateStatus(null)` never escalates.
 - **Validation pipeline**: raw agent HTTP responses → `classifyResult()` → `validateGpuResponse()` (Zod) → stored/used. Never skip validation. Classification: `ok` / `fetch-failed` / `health-failed` / `invalid`.
 - **Notifications in main only**: `NotificationService` (self-contained: logger + dispatcher) evaluates per-metric thresholds with per-metric previous state and per-trigger cooldowns, fires `Electron.Notification`. Renderer is pure display.
-- **Tray icon uses per-metric evaluation** via shared `evaluateStatus()`: junction/vram critical temps override core-only normal state. 4 states: default(gray), normal(green), warning(yellow), critical(red).
+- **Tray icon uses per-metric evaluation** via shared `evaluateStatus()`: junction/vram critical temps override core-only normal state; null temps render `--` and never escalate. 4 states: default(gray), normal(green), warning(yellow), critical(red).
 - **Poll cycle**: `PollingService` owns the active settings and the cycle (fetch → classify → stale → notify → tray → push). All entry points (interval, stale check, manual refresh) run the same `runCycle()`.
 - **Agent polling via Node.js `http`**: main process fetches, not renderer. `Promise.allSettled` for parallel agent polling; timeout enforced by `IHttpAdapter`.
 - **Settings validation**: Zod schema in `settings.ts`. Agent URLs validated via `agentUrlSchema` (http/https only, rejects `file://`).

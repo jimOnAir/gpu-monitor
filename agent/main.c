@@ -1,7 +1,9 @@
 /**
  * gputempd - GPU temperature daemon
  * 
- * Reads Core, Junction, and VRAM temperatures via NVML + /dev/mem
+ * Reads Core, Junction, and VRAM temperatures via NVML + NVAPI
+ * (junction/VRAM; /dev/mem BAR0 legacy fallback). Unavailable sensors
+ * are reported as JSON null.
  * Serves data over HTTP on configurable port
  * 
  * Build:
@@ -96,6 +98,10 @@ void fill_gpu_status(struct GpuData *gpu, int index) {
         gpu->index = index;
         strcpy(gpu->name, "Unknown GPU");
         gpu->coreTemp = 0;
+        gpu->junctionTemp = 0;
+        gpu->junctionTempValid = 0;
+        gpu->vramTemp = 0;
+        gpu->vramTempValid = 0;
         gpu->utilization = 0;
         gpu->memoryUsed = 0;
         gpu->memoryTotal = 0;
@@ -108,8 +114,9 @@ void fill_gpu_status(struct GpuData *gpu, int index) {
         gpu->uuid[sizeof(gpu->uuid) - 1] = '\0';
     }
     
-    // Junction/VRAM from /dev/mem (may fail if mmap not available)
-    nvml_read_junction_vram(index, &gpu->junctionTemp, &gpu->vramTemp);
+    // Junction/VRAM via NVAPI, /dev/mem BAR0 fallback (may be unavailable -> null)
+    nvml_read_junction_vram(index, &gpu->junctionTemp, &gpu->junctionTempValid,
+                            &gpu->vramTemp, &gpu->vramTempValid);
     
     /* Extended metrics */
     if (nvml_gpu_exists(index)) {
@@ -160,9 +167,22 @@ char* generate_json_response(void) {
         json_escape_string(gpu->model, escaped_model, sizeof(escaped_model));
         json_escape_string(gpu->partNumber, escaped_part_number, sizeof(escaped_part_number));
 
+        // Unavailable sensors are emitted as JSON null
+        char junction_json[32], vram_json[32];
+        if (gpu->junctionTempValid) {
+            snprintf(junction_json, sizeof(junction_json), "%.1f", gpu->junctionTemp);
+        } else {
+            snprintf(junction_json, sizeof(junction_json), "null");
+        }
+        if (gpu->vramTempValid) {
+            snprintf(vram_json, sizeof(vram_json), "%.1f", gpu->vramTemp);
+        } else {
+            snprintf(vram_json, sizeof(vram_json), "null");
+        }
+
         offset += snprintf(response + offset, (size_t)remaining,
             "{\"uuid\":\"%s\",\"index\":%d,\"name\":\"%s\","
-            "\"coreTemp\":%.1f,\"junctionTemp\":%.1f,\"vramTemp\":%.1f,"
+            "\"coreTemp\":%.1f,\"junctionTemp\":%s,\"vramTemp\":%s,"
             "\"gpuUtilization\":%.1f,\"memoryUsed\":%lu,\"memoryTotal\":%lu,\"powerUsage\":%.1f,"
             "\"fanSpeed\":%d,\"gpuClockMHz\":%d,\"memClockMHz\":%d,"
             "\"tempShutdown\":%d,\"tempSlowdown\":%d,\"powerCapW\":%.1f,"
@@ -172,8 +192,8 @@ char* generate_json_response(void) {
             gpu->index,
             escaped_name,
             gpu->coreTemp,
-            gpu->junctionTemp,
-            gpu->vramTemp,
+            junction_json,
+            vram_json,
             gpu->utilization,
             gpu->memoryUsed,
             gpu->memoryTotal,
@@ -324,7 +344,7 @@ int main(int argc, char *argv[]) {
         if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
             printf("Usage: gputempd [port]\n"
                    "\n"
-                   "GPU temperature daemon — reads Core/Junction/VRAM temps via NVML + /dev/mem.\n"
+                   "GPU temperature daemon — reads Core/Junction/VRAM temps via NVML + NVAPI.\n"
                    "\n"
                    "Options:\n"
                    "  port      HTTP port (default: 8080, or GPUTEMP_PORT env var)\n"
@@ -341,7 +361,9 @@ int main(int argc, char *argv[]) {
                    "  GET /gpu     - JSON {timestamp, gpus: [...]}\n"
                    "  GET /health  - {\"status\":\"ok\"}\n"
                    "\n"
-                   "Note: Junction/VRAM temps require `iomem=relaxed` kernel parameter.\n");
+                   "Note: Junction/VRAM temps use NVAPI (libnvidia-api.so.1); the legacy\n"
+                   "      /dev/mem BAR0 fallback requires `iomem=relaxed` (not available\n"
+                   "      on Blackwell/RTX 50 — NVAPI is required there).\n");
             nvml_cleanup();
             return 0;
         }

@@ -9,7 +9,7 @@ echo "=== Building gputempd on ${REMOTE} ==="
 # 1. Package source
 tar -czf /tmp/gpu-monitor-agent.tar.gz \
   -C "$(dirname "$0")/.." \
-  gpu.c gpu.h main.c Makefile
+  gpu.c gpu.h gpu_identity.c gpu_identity.h main.c logger.c logger.h nvapi_temps.c nvapi_temps.h Makefile
 
 # 2. Copy to remote
 scp /tmp/gpu-monitor-agent.tar.gz "${USER}@${REMOTE}:/tmp/"

@@ -10,7 +10,21 @@ C-агент для чтения температур NVIDIA GPU и отобра
 
 Агент отправляет только «сырые» температуры. Оценка статуса
 (normal/warning/danger) выполняется приложением GPU Monitor
-по пользовательским порогам.
+по пользовательским порогам. Недоступные сенсоры отдаются как `null`.
+
+## Источники температур Junction/VRAM
+
+| Архитектура | Junction | VRAM |
+|-------------|----------|------|
+| Turing – Ada (RTX 20/30/40) | NVAPI therm channel (type 1) | NVAPI therm channel (type 3), legacy BAR0 fallback |
+| Blackwell (RTX 50) | NVAPI register op, агрегированный регистр `0xad0aa0` — **только под root** | NVAPI therm channel (type 3) |
+
+NVAPI (`libnvidia-api.so.1`, есть в драйверах ~560+) — основной источник;
+механизм портирован из [LACT](https://github.com/ilya-zlobintsev/LACT) (MIT).
+Legacy `/dev/mem` BAR0-фолбэк (регистры `0x0002046C`/`0x0000E2A8`) требует
+`iomem=relaxed` и **не работает на Blackwell** — там эти офсёты мертвы.
+Если сенсор недоступен всеми способами, в JSON приходит `null`
+(в приложении отображается как `--`).
 
 ## Зависимости
 
@@ -74,8 +88,8 @@ GPUTEMP_PORT=9100 sudo ./gputempd
 | `gpus[].index` | int | NVML device index |
 | `gpus[].name` | string | GPU model name |
 | `gpus[].coreTemp` | float | Core temperature (°C) |
-| `gpus[].junctionTemp` | float | Junction temperature (°C), 0 if unavailable |
-| `gpus[].vramTemp` | float | VRAM temperature (°C), 0 if unavailable |
+| `gpus[].junctionTemp` | float \| null | Junction temperature (°C), `null` if sensor unavailable |
+| `gpus[].vramTemp` | float \| null | VRAM temperature (°C), `null` if sensor unavailable |
 | `gpus[].gpuUtilization` | float | GPU utilization (%) |
 | `gpus[].memoryUsed` | int | Video memory used (bytes) |
 | `gpus[].memoryTotal` | int | Total video memory (bytes) |
@@ -121,9 +135,19 @@ GPUTEMP_LOG_LEVEL=DEBUG        # Log level: DEBUG, INFO (default), WARN, ERROR
 
 ## Troubleshooting
 
-### mmap error: `/dev/mem` access denied
+### junctionTemp = null на RTX 50 (Blackwell)
 
-**Symptom:** `gputempd` fails with `mmap: Permission denied`
+Blackwell hotspot читается только через NVAPI register op, который
+требует root (запускайте демон через systemd/sudo, как и предусмотрено).
+VRAM (GDDR7) читается therm-каналом и работает без root.
+
+**Check:** `GPUTEMP_LOG_LEVEL=DEBUG gputempd 19091` — ищи
+`NVAPI ... failed` строки. `libnvidia-api.so.1 not found` → драйвер
+старше ~560 или не установлен userspace-пакет NVIDIA.
+
+### mmap error: `/dev/mem` access denied (legacy fallback only)
+
+**Symptom:** `gputempd` fails with `mmap: Permission denied` on pre-NVAPI GPUs
 
 **Solution:** Add `iomem=relaxed` to GRUB:
 

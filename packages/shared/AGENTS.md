@@ -22,10 +22,10 @@ Runs `tsc` against `tsconfig.json`, outputs to `dist/`.
 
 ### Key Types
 - `MetricStatus` — `'normal' | 'warning' | 'danger'` — the single status label vocabulary
-- `evaluateStatus(temp, warn, critical)` — pure threshold evaluation; the single source of truth for temp-vs-threshold logic (consumed by tray, notifications, renderer)
+- `evaluateStatus(temp, warn, critical)` — pure threshold evaluation; the single source of truth for temp-vs-threshold logic (consumed by tray, notifications, renderer). `temp: number | null` — null means sensor unavailable and always evaluates `normal`
 - `worstStatus(current, ...others)` — pure; returns the worst status among the given
 - `DEFAULT_SETTINGS` — default settings object (lives in `status.ts`, not `ISettings.ts`)
-- `IGpu` — GPU identity, temps, utilization, power; optional extended fields: `fanSpeed`, `gpuClockMHz`, `memClockMHz`, `tempShutdown`, `tempSlowdown`, `powerCapW`, `driverVersion`, `perfState`, `vendor`, `model`, `partNumber` (the C agent no longer sends status fields — consumers compute status via `evaluateStatus`)
+- `IGpu` — GPU identity, temps, utilization, power; `junctionTemp`/`vramTemp` are `number | null` (null = sensor unavailable on this architecture); optional extended fields: `fanSpeed`, `gpuClockMHz`, `memClockMHz`, `tempShutdown`, `tempSlowdown`, `powerCapW`, `driverVersion`, `perfState`, `vendor`, `model`, `partNumber` (the C agent no longer sends status fields — consumers compute status via `evaluateStatus`)
 - `IAgent` — agent endpoint configuration; `status` is optional (defaults handled by main process)
 - `ISettings` — app settings (agents list, refresh interval, thresholds, notifications config)
 - `INotificationsConfig` — notifications settings (enabled, cooldowns)

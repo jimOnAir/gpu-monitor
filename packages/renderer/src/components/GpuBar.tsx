@@ -4,7 +4,8 @@ import React from 'react';
 import { getStatusColor } from '../utils/statusDisplay';
 
 interface GpuBarProps {
-  value: number;
+  /** null = sensor unavailable */
+  value: number | null;
   max: number;
   unit?: string;
   status: MetricStatus;
@@ -20,12 +21,17 @@ export const GpuBar: React.FC<GpuBarProps> = ({
   showDetail,
   animated = true,
 }) => {
-  const percentage = Math.min((value / max) * 100, 100);
+  const percentage = value === null ? 0 : Math.min((value / max) * 100, 100);
   const statusColor = getStatusColor(status);
 
-  const displayValue = showDetail
-    ? `${value.toFixed(0)}/${max.toFixed(0)}${unit}`
-    : `${Math.round(value)}${unit}`;
+  let displayValue: string;
+  if (value === null) {
+    displayValue = '--';
+  } else if (showDetail) {
+    displayValue = `${value.toFixed(0)}/${max.toFixed(0)}${unit}`;
+  } else {
+    displayValue = `${Math.round(value)}${unit}`;
+  }
 
   return (
     <div className="gpu-bar-container">

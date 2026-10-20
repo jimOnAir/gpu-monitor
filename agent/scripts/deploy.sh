@@ -18,7 +18,7 @@ fi
 # 1. Package source + service file only (never ship pre-built binaries)
 tar -czf /tmp/gpu-monitor-agent.tar.gz \
   -C "$SCRIPT_DIR" \
-  gpu.c gpu.h gpu_identity.c gpu_identity.h main.c logger.c logger.h Makefile gputempd.service
+  gpu.c gpu.h gpu_identity.c gpu_identity.h main.c logger.c logger.h nvapi_temps.c nvapi_temps.h Makefile gputempd.service
 
 if is_local; then
   # Local deploy: extract, build, install in-place
@@ -43,7 +43,9 @@ if is_local; then
   sudo install -m 755 gputempd /usr/local/bin/gputempd
   sudo install -m 644 gputempd.service /etc/systemd/system/gputempd.service
   sudo systemctl daemon-reload
-  sudo systemctl enable --now gputempd
+  sudo systemctl enable gputempd
+  # enable --now does NOT restart an already-active unit — force the new binary in
+  sudo systemctl restart gputempd
   sleep 2
 
   echo
@@ -92,8 +94,9 @@ EOF
     sudo install -m 644 gputempd.service /etc/systemd/system/gputempd.service
     sudo systemctl daemon-reload
 
-    echo "Enabling and starting service..."
-    sudo systemctl enable --now gputempd
+    echo "Enabling and (re)starting service..."
+    sudo systemctl enable gputempd
+    sudo systemctl restart gputempd
     sleep 1
 
     echo

@@ -79,7 +79,8 @@ const MetricBar: React.FC<MetricBarProps> = ({ label, value, max, unit, status, 
 
 interface TempRowProps {
   label: string;
-  value: number;
+  /** null = sensor unavailable */
+  value: number | null;
   status: MetricStatus;
   shutdown?: number;
   slowdown?: number;
@@ -89,9 +90,9 @@ const TempRow: React.FC<TempRowProps> = ({ label, value, status, shutdown, slowd
   <div className="detail-temp-row">
     <span className="detail-temp-label">{label}</span>
     <div className="detail-temp-bar-wrap">
-      <GpuBar value={value} max={Math.max(shutdown || 110, value * 1.2)} unit="°C" status={status} animated />
+      <GpuBar value={value} max={Math.max(shutdown || 110, (value ?? 0) * 1.2)} unit="°C" status={status} animated />
     </div>
-    <span className="detail-temp-value">{value.toFixed(0)}°C</span>
+    <span className="detail-temp-value">{value === null ? '--' : `${value.toFixed(0)}°C`}</span>
     {(shutdown !== undefined || slowdown !== undefined) && (
       <div className="detail-temp-thresholds">
         {slowdown !== undefined && <span>SL: {slowdown}°C</span>}

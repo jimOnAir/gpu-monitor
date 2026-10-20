@@ -41,8 +41,12 @@ export const DEFAULT_SETTINGS: ISettings = {
 /**
  * Evaluate a temperature against warn/critical thresholds.
  * Pure function — no side effects.
+ * A null temperature means the sensor is unavailable: it never escalates.
  */
-export function evaluateStatus(temp: number, warn: number, critical: number): MetricStatus {
+export function evaluateStatus(temp: number | null, warn: number, critical: number): MetricStatus {
+  if (temp === null) {
+    return 'normal';
+  }
   if (temp >= critical) {
     return 'danger';
   }

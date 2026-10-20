@@ -1,13 +1,16 @@
 /**
  * GPU read functions implementation
- * 
+ *
  * Uses NVML for Core temp, utilization, memory, power
- * Uses /dev/mem mmap for Junction (0x0002046C) and VRAM (0x0000E2A8) temps
+ * Junction/VRAM temps: NVAPI (nvapi_temps.c) first, /dev/mem BAR0 mmap
+ * fallback with Turing/Ampere/Ada registers (0x0002046C junction,
+ * 0x0000E2A8 VRAM). The BAR0 offsets are dead on Blackwell — NVAPI only.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -17,9 +20,14 @@
 
 #include "gpu.h"
 #include "logger.h"
+#include "nvapi_temps.h"
 
 #define HOTSPOT_REGISTER_OFFSET 0x0002046C
 #define VRAM_REGISTER_OFFSET 0x0000E2A8
+
+#ifndef NVML_DEVICE_ARCH_BLACKWELL
+#define NVML_DEVICE_ARCH_BLACKWELL 10 /* NVML >= 12.8 headers; older headers lack it */
+#endif
 
 static nvmlDevice_t *devices = NULL;
 static unsigned int device_count = 0;
@@ -119,11 +127,92 @@ int nvml_gpu_uuid(int index, char *buf, size_t buf_size) {
     return 0;
 }
 
-void nvml_read_junction_vram(int index, double *junctionTemp, double *vramTemp) {
-    if (junctionTemp) *junctionTemp = 0;
-    if (vramTemp) *vramTemp = 0;
+/* nvmlDeviceGetArchitecture is only resolved at runtime (older build headers lack it) */
+static int device_is_blackwell(int index) {
+    typedef nvmlReturn_t (*get_arch_fn)(nvmlDevice_t, unsigned int *);
+    static get_arch_fn get_arch;
+    static int resolved;
 
-    // Get PCI info for this GPU
+    if (!resolved) {
+        resolved = 1;
+        get_arch = (get_arch_fn)dlsym(RTLD_DEFAULT, "nvmlDeviceGetArchitecture");
+    }
+    if (!get_arch) {
+        return 0;
+    }
+    unsigned int arch = 0;
+    if (get_arch(devices[index], &arch) != NVML_SUCCESS) {
+        return 0;
+    }
+    return arch == NVML_DEVICE_ARCH_BLACKWELL;
+}
+
+/* Read one BAR0 temperature register via /dev/mem. Returns 1 and sets *out on success. */
+static int bar0_read_temp(uint32_t bar0, uint32_t reg_offset, double *out,
+                          unsigned int shift, uint32_t mask, double divisor, const char *what) {
+    long page = sysconf(_SC_PAGE_SIZE);
+    uint32_t reg_addr = bar0 + reg_offset;
+    uint32_t map_page = reg_addr & ~((uint32_t)page - 1);
+    int fd = open("/dev/mem", O_RDWR | O_SYNC);
+    if (fd < 0) {
+        log_warn("/dev/mem open failed (%s): %s", what, strerror(errno));
+        return 0;
+    }
+    void *map_base = mmap(0, (size_t)page, PROT_READ, MAP_SHARED, fd, map_page);
+    if (map_base == MAP_FAILED) {
+        log_warn("/dev/mem mmap failed (%s): %s", what, strerror(errno));
+        close(fd);
+        return 0;
+    }
+    uint32_t val = *(volatile uint32_t *)((char *)map_base + (reg_addr - map_page));
+    munmap(map_base, (size_t)page);
+    close(fd);
+
+    double temp = (double)((val >> shift) & mask) / divisor;
+    if (temp <= 0 || temp >= 255) {
+        log_debug("BAR0 %s: raw=0x%08X parsed %.0f\u00b0C — out of range", what, val, temp);
+        return 0;
+    }
+    log_debug("BAR0 %s: raw=0x%08X temp=%.0f\u00b0C (bar0=0x%08X)", what, val, temp, bar0);
+    *out = temp;
+    return 1;
+}
+
+/* Locate BAR0 base address of the GPU via libpci. Returns 1 when found. */
+static int find_bar0(const nvmlPciInfo_t *pci_info, uint32_t *bar0) {
+    struct pci_access *pacc = pci_alloc();
+    if (!pacc) {
+        log_error("failed to allocate PCI structure");
+        return 0;
+    }
+    pci_init(pacc);
+    pci_scan_bus(pacc);
+
+    int found = 0;
+    for (struct pci_dev *dev = pacc->devices; dev; dev = dev->next) {
+        pci_fill_info(dev, PCI_FILL_IDENT | PCI_FILL_BASES);
+        if ((dev->device_id << 16 | dev->vendor_id) != pci_info->pciDeviceId ||
+            (unsigned int)dev->domain != pci_info->domain ||
+            dev->bus != pci_info->bus ||
+            dev->dev != pci_info->device) {
+            continue;
+        }
+        *bar0 = dev->base_addr[0] & 0xFFFFFFFF;
+        found = 1;
+        break;
+    }
+    pci_cleanup(pacc);
+    return found;
+}
+
+void nvml_read_junction_vram(int index, double *junctionTemp, int *junctionValid,
+                             double *vramTemp, int *vramValid) {
+    if (junctionTemp) *junctionTemp = 0;
+    if (junctionValid) *junctionValid = 0;
+    if (vramTemp) *vramTemp = 0;
+    if (vramValid) *vramValid = 0;
+
+    /* PCI info: bus number for NVAPI, full BDF for the BAR0 fallback */
     nvmlPciInfo_t pci_info;
     nvmlReturn_t result = nvmlDeviceGetPciInfo(devices[index], &pci_info);
     if (result != NVML_SUCCESS) {
@@ -131,108 +220,45 @@ void nvml_read_junction_vram(int index, double *junctionTemp, double *vramTemp) 
         return;
     }
 
-    // Initialize PCI access
-    struct pci_access *pacc = pci_alloc();
-    if (!pacc) {
-        log_error("GPU %d: failed to allocate PCI structure", index);
-        return;
-    }
-    pci_init(pacc);
-    pci_scan_bus(pacc);
-
-    /* Scan PCI devices to find the matching GPU and its BAR0 base address */
-    int checked = 0;
-    int fd = -1;
-    void *map_base = NULL;
-    uint32_t bar0 = 0;
-
-    for (struct pci_dev *dev = pacc->devices; dev; dev = dev->next) {
-        checked++;
-        pci_fill_info(dev, PCI_FILL_IDENT | PCI_FILL_BASES);
-
-        if ((dev->device_id << 16 | dev->vendor_id) != pci_info.pciDeviceId ||
-            (unsigned int)dev->domain != pci_info.domain ||
-            dev->bus != pci_info.bus ||
-            dev->dev != pci_info.device) {
-            continue;
+    /* 1) NVAPI: therm channels + Blackwell aggregated hotspot register */
+    if (nvapi_temps_supported()) {
+        NvapiTemps temps;
+        if (nvapi_read_temps((unsigned int)pci_info.bus, device_is_blackwell(index), &temps) == 0) {
+            if (junctionTemp) *junctionTemp = temps.junction;
+            if (junctionValid) *junctionValid = temps.junctionValid;
+            if (vramTemp) *vramTemp = temps.vram;
+            if (vramValid) *vramValid = temps.vramValid;
         }
-
-        bar0 = dev->base_addr[0] & 0xFFFFFFFF;
-
-        fd = open("/dev/mem", O_RDWR | O_SYNC);
-        if (fd < 0) {
-            log_warn("GPU %d: failed to open /dev/mem: %s", index, strerror(errno));
-            goto junction_vram_done;
-        }
-
-        uint32_t junc_reg_addr = bar0 + HOTSPOT_REGISTER_OFFSET;
-        uint32_t junc_base = junc_reg_addr & ~(sysconf(_SC_PAGE_SIZE) - 1);
-        map_base = mmap(0, sysconf(_SC_PAGE_SIZE), PROT_READ, MAP_SHARED, fd, junc_base);
-
-        if (map_base == MAP_FAILED) {
-            log_warn("GPU %d: failed to mmap /dev/mem (junction): %s", index, strerror(errno));
-            close(fd);
-            fd = -1;
-            goto junction_vram_done;
-        }
-
-        /* Junction temperature */
-        uint32_t junc_offset = junc_reg_addr - junc_base;
-        uint32_t junc_val = *((uint32_t *)((char *)map_base + junc_offset));
-        uint32_t junction = (junc_val >> 8) & 0xff;
-        log_debug("GPU %d: junction raw=0x%08X temp=%d\u00b0C (bar0=0x%08X offset=%u)",
-            index, junc_val, junction, bar0, junc_offset);
-        if (junctionTemp) *junctionTemp = junction;
-
-        /* VRAM temperature — separate mmap since it's far from junction */
-        munmap(map_base, sysconf(_SC_PAGE_SIZE));
-        map_base = NULL;
-        close(fd);
-        fd = -1;
-
-        uint32_t vram_reg_addr = bar0 + VRAM_REGISTER_OFFSET;
-        uint32_t vram_base = vram_reg_addr & ~(sysconf(_SC_PAGE_SIZE) - 1);
-        fd = open("/dev/mem", O_RDWR | O_SYNC);
-        if (fd < 0) {
-            log_warn("GPU %d: failed to open /dev/mem (VRAM): %s", index, strerror(errno));
-            goto junction_vram_done;
-        }
-
-        map_base = mmap(0, sysconf(_SC_PAGE_SIZE), PROT_READ, MAP_SHARED, fd, vram_base);
-        if (map_base == MAP_FAILED) {
-            log_warn("GPU %d: failed to mmap /dev/mem (VRAM): %s", index, strerror(errno));
-            close(fd);
-            fd = -1;
-            goto junction_vram_done;
-        }
-
-        uint32_t vram_offset = vram_reg_addr - vram_base;
-        uint32_t vram_val = *((uint32_t *)((char *)map_base + vram_offset));
-        uint32_t vram = (vram_val & 0x00000fff) / 0x20;
-        log_debug("GPU %d: VRAM raw=0x%08X temp=%d\u00b0C (bar0=0x%08X offset=%u)",
-            index, vram_val, vram, bar0, vram_offset);
-        if (vramTemp) *vramTemp = vram;
-
-junction_vram_done:
-        if (map_base && map_base != MAP_FAILED) {
-            munmap(map_base, sysconf(_SC_PAGE_SIZE));
-        }
-        if (fd >= 0) {
-            close(fd);
-        }
-        break;
     }
 
-    /* Summary log */
-    if (junctionTemp && junctionTemp != 0) {
-        log_info("GPU %d: junction=%d\u00b0C vram=%d\u00b0C via /dev/mem (bar0=0x%08X, scanned %d devices)",
-            index, (int)*junctionTemp, (int)*vramTemp, bar0, checked);
+    /* 2) Legacy /dev/mem BAR0 fallback for any metric NVAPI could not provide */
+    int junction_missing = junctionValid && !*junctionValid;
+    int vram_missing = vramValid && !*vramValid;
+    if (junction_missing || vram_missing) {
+        uint32_t bar0 = 0;
+        if (find_bar0(&pci_info, &bar0)) {
+            if (junction_missing) {
+                *junctionValid = bar0_read_temp(bar0, HOTSPOT_REGISTER_OFFSET,
+                    junctionTemp, 8, 0xff, 1, "junction");
+            }
+            if (vram_missing) {
+                *vramValid = bar0_read_temp(bar0, VRAM_REGISTER_OFFSET,
+                    vramTemp, 0, 0xfff, 32, "VRAM");
+            }
+        } else {
+            log_debug("GPU %d: no PCI BAR0 match for legacy junction/VRAM fallback", index);
+        }
+    }
+
+    if ((junctionValid && *junctionValid) || (vramValid && *vramValid)) {
+        log_debug("GPU %d: junction=%d\u00b0C(%s) vram=%d\u00b0C(%s)", index,
+            (junctionValid && *junctionValid) ? (int)*junctionTemp : 0,
+            (junctionValid && *junctionValid) ? "ok" : "n/a",
+            (vramValid && *vramValid) ? (int)*vramTemp : 0,
+            (vramValid && *vramValid) ? "ok" : "n/a");
     } else {
-        log_warn("GPU %d: /dev/mem junction/VRAM read failed (scanned %d PCI devices, no match)",
-            index, checked);
+        log_warn("GPU %d: junction/VRAM unavailable via NVAPI and /dev/mem", index);
     }
-
-    pci_cleanup(pacc);
 }
 
 void nvml_gpu_fan_speed(int index, int *fanSpeed) {

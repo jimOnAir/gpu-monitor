@@ -141,7 +141,7 @@ export class NotificationService implements INotificationService {
   }
 
   private gatherMetrics(gpuList: IGpu[], thresholds: ITemperatureThresholds): TemperatureMetric[] {
-    const keyMap: Array<{ key: keyof ITemperatureThresholds, tempKey: keyof IGpu }> = [
+    const keyMap: Array<{ key: keyof ITemperatureThresholds, tempKey: 'coreTemp' | 'junctionTemp' | 'vramTemp' }> = [
       { key: 'core', tempKey: 'coreTemp' },
       { key: 'junction', tempKey: 'junctionTemp' },
       { key: 'vram', tempKey: 'vramTemp' },
@@ -151,12 +151,17 @@ export class NotificationService implements INotificationService {
 
     for (const gpu of gpuList) {
       for (const { key, tempKey } of keyMap) {
+        const temp = gpu[tempKey];
+        if (temp === null) {
+          // Sensor unavailable — no evaluation, no notification, previous state retained
+          continue;
+        }
         metrics.push({
           metric: key,
-          temp: gpu[tempKey] as number,
+          temp,
           warn: thresholds[key].warn,
           critical: thresholds[key].critical,
-          status: evaluateStatus(gpu[tempKey] as number, thresholds[key].warn, thresholds[key].critical),
+          status: evaluateStatus(temp, thresholds[key].warn, thresholds[key].critical),
         });
       }
     }

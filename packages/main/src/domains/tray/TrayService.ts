@@ -72,8 +72,8 @@ export class TrayService implements ITrayService {
         const vramState = evaluateStatus(gpu.vramTemp, settings.thresholds.vram.warn, settings.thresholds.vram.critical);
         maxState = worstStatus(maxState, coreState, junctionState, vramState);
         const coreT = String(gpu.coreTemp);
-        const junctionT = String(gpu.junctionTemp);
-        const vramT = String(gpu.vramTemp);
+        const junctionT = gpu.junctionTemp === null ? '--' : String(gpu.junctionTemp);
+        const vramT = gpu.vramTemp === null ? '--' : String(gpu.vramTemp);
         const utilPct = String(gpu.gpuUtilization);
         const watts = String(Math.round(gpu.powerUsage));
         tooltipParts.push(

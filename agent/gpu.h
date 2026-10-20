@@ -1,10 +1,12 @@
 /**
- * GPU read functions - NVML + /dev/mem for Junction/VRAM temps
+ * GPU read functions - NVML core metrics; Junction/VRAM temps via NVAPI
+ * with /dev/mem BAR0 as fallback (Turing-Ampere-Ada register offsets)
  */
 
 #ifndef GPU_H
 #define GPU_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 struct GpuData {
@@ -12,8 +14,10 @@ struct GpuData {
     char uuid[80];
     char name[256];
     double coreTemp;
-    double junctionTemp;
-    double vramTemp;
+    double junctionTemp;   /* valid only when junctionTempValid */
+    int junctionTempValid;
+    double vramTemp;       /* valid only when vramTempValid */
+    int vramTempValid;
     double utilization;
     uint64_t memoryUsed;
     uint64_t memoryTotal;
@@ -49,8 +53,10 @@ void nvml_gpu_info(int index, char *name, double *coreTemp, double *utilization,
 // GPU UUID from NVML (writes to buf, returns 0 on success, -1 on failure)
 int nvml_gpu_uuid(int index, char *buf, size_t buf_size);
 
-// Junction/VRAM temps from /dev/mem (may fail if mmap not available)
-void nvml_read_junction_vram(int index, double *junctionTemp, double *vramTemp);
+/* Junction/VRAM temps: NVAPI first, /dev/mem BAR0 fallback.
+ * Valid flags are cleared when a sensor cannot be read (caller emits null). */
+void nvml_read_junction_vram(int index, double *junctionTemp, int *junctionValid,
+                             double *vramTemp, int *vramValid);
 
 /* Extended metric queries */
 void nvml_gpu_fan_speed(int index, int *fanSpeed);
