@@ -11,6 +11,9 @@ export interface IThemeColors {
 }
 
 export class ElectronWindowFactory implements IWindowFactory {
+  /** Maps domain handles back to their native BrowserWindow (needed for parent linkage). */
+  private readonly windowByHandle = new WeakMap<IWindowHandle, BrowserWindow>();
+
   constructor(
     private readonly themeColors: IThemeColors = { dark: '#1E2733', light: '#FFFFFF' },
   ) {}
@@ -46,7 +49,7 @@ export class ElectronWindowFactory implements IWindowFactory {
       height: opts.height,
       minWidth: opts.minWidth,
       minHeight: opts.minHeight,
-      parent: opts.parent ? (opts.parent as unknown as BrowserWindow) : undefined,
+      parent: opts.parent ? this.windowByHandle.get(opts.parent) : undefined,
       frame: false,
       transparent: false,
       resizable: true,
@@ -86,7 +89,7 @@ export class ElectronWindowFactory implements IWindowFactory {
       return { action: opts.onWindowOpen(url) };
     });
 
-    return {
+    const handle: IWindowHandle = {
       show: () => {
         win.show();
       },
@@ -107,6 +110,12 @@ export class ElectronWindowFactory implements IWindowFactory {
       send: (channel: string, ...args: unknown[]) => {
         win.webContents.send(channel, ...args);
       },
+      getBounds: () => win.getBounds(),
+      isMaximized: () => win.isMaximized(),
+      isFullScreen: () => win.isFullScreen(),
     };
+    this.windowByHandle.set(handle, win);
+
+    return handle;
   }
 }

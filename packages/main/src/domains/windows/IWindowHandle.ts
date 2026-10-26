@@ -11,4 +11,8 @@ export interface IWindowHandle {
   isVisible: () => boolean;
   close: () => void;
   send: (channel: string, ...args: unknown[]) => void;
+  /** Window geometry — used by the state persister to snapshot bounds before hide/close. */
+  getBounds: () => { x: number, y: number, width: number, height: number };
+  isMaximized: () => boolean;
+  isFullScreen: () => boolean;
 }

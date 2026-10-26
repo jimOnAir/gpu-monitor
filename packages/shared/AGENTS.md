@@ -31,9 +31,10 @@ Runs `tsc` against `tsconfig.json`, outputs to `dist/`.
 - `INotificationsConfig` — notifications settings (enabled, cooldowns)
 - `EAgentStatus` — enum for agent connection states
 - `IElectronAPI` — type-safe IPC surface exposed via `contextBridge`; consumed by both `preload.ts` and renderer
-- `GpuDataPayload` — payload shape for `gpu-data-update` IPC events
+- `GpuDataPayload` — payload shape for `gpu-data-update` IPC events (includes `averages`: rolling 1/5/10-min metric means per agent/GPU)
+- `IGpuAverages` / `IMetricWindows` — rolling 1/5/10-min averages (`m1`/`m5`/`m10`, raw units, null = no samples in window) for the 9 time-varying metrics; computed app-side, never by the C agent
 - `FetchResult` — `'pending' | 'ok' | 'fetch-failed' | 'health-failed' | 'invalid'`
-- `AgentData` — full runtime state (7 maps); the renderer derives `AgentState = Omit<AgentData, 'prevAgentStatus'>`
+- `AgentData` — full runtime state (8 maps); the renderer derives `AgentState = Omit<AgentData, 'prevAgentStatus'>`
 
 ## Verification
 

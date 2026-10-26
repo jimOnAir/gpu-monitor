@@ -29,3 +29,10 @@ agent/*.o
 
 # Electron-builder output
 release/
+
+# Local ticket tracker
+.scratch/
+
+# Playwright output
+test-results/
+playwright-report/

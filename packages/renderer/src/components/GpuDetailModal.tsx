@@ -1,8 +1,9 @@
-import { evaluateStatus, type EAgentStatus, type IGpu, type ISettings, type MetricStatus } from '@gpu-monitor/shared';
+import { evaluateStatus, type EAgentStatus, type IGpu, type IGpuAverages, type ISettings, type MetricStatus } from '@gpu-monitor/shared';
 import React from 'react';
 
 import { GB, getGpuUtilizationStatus, getMemoryStatus, getPowerStatus } from '../utils/constants';
-import { getAgentStatusLabel, getStatusColor } from '../utils/statusDisplay';
+import { avgDisplay, type AvgDisplay } from '../utils/metricAverages';
+import { getAgentStatusLabel } from '../utils/statusDisplay';
 
 import { GpuBar } from './GpuBar';
 
@@ -12,6 +13,7 @@ interface GpuDetailModalProps {
   agentName: string;
   agentStatus: EAgentStatus;
   driverVersion?: string;
+  averages?: IGpuAverages;
   settings: ISettings;
   onClose: () => void;
 }
@@ -50,32 +52,25 @@ interface MetricBarProps {
   unit: string;
   status: MetricStatus;
   hint?: string;
+  /** Rolling 1/5/10-min averages micro-line shown under the current value. */
+  avg?: AvgDisplay | null;
 }
 
-const MetricBar: React.FC<MetricBarProps> = ({ label, value, max, unit, status, hint }) => {
-  const percentage = Math.min((value / max) * 100, 100);
-
-  return (
-    <div className="detail-metric-bar">
-      <div className="detail-metric-bar-header">
-        <span className="detail-metric-bar-label">{label}</span>
+const MetricBar: React.FC<MetricBarProps> = ({ label, value, max, unit, status, hint, avg }) => (
+  <div className="detail-metric-bar">
+    <div className="detail-metric-bar-header">
+      <span className="detail-metric-bar-label">{label}</span>
+      <div className="detail-metric-bar-value-col">
         <span className="detail-metric-bar-value">
           {value.toFixed(0)}{unit}
         </span>
+        {avg ? <span className="detail-metric-avg" title={avg.tooltip}>{avg.line}</span> : null}
       </div>
-      <div className="detail-metric-bar-track">
-        <div
-          className="detail-metric-bar-fill"
-          style={{
-            width: `${percentage}%`,
-            backgroundColor: getStatusColor(status),
-          }}
-        />
-      </div>
-      {hint && <div className="detail-metric-bar-hint">{hint}</div>}
     </div>
-  );
-};
+    <GpuBar value={value} max={max} status={status} />
+    {hint && <div className="detail-metric-bar-hint">{hint}</div>}
+  </div>
+);
 
 interface TempRowProps {
   label: string;
@@ -84,15 +79,20 @@ interface TempRowProps {
   status: MetricStatus;
   shutdown?: number;
   slowdown?: number;
+  /** Rolling 1/5/10-min averages micro-line shown under the current value. */
+  avg?: AvgDisplay | null;
 }
 
-const TempRow: React.FC<TempRowProps> = ({ label, value, status, shutdown, slowdown }) => (
+const TempRow: React.FC<TempRowProps> = ({ label, value, status, shutdown, slowdown, avg }) => (
   <div className="detail-temp-row">
     <span className="detail-temp-label">{label}</span>
     <div className="detail-temp-bar-wrap">
-      <GpuBar value={value} max={Math.max(shutdown || 110, (value ?? 0) * 1.2)} unit="°C" status={status} animated />
+      <GpuBar value={value} max={Math.max(shutdown || 110, (value ?? 0) * 1.2)} status={status} animated />
     </div>
-    <span className="detail-temp-value">{value === null ? '--' : `${value.toFixed(0)}°C`}</span>
+    <div className="detail-temp-value">
+      <span>{value === null ? '--' : `${value.toFixed(0)}°C`}</span>
+      {avg ? <span className="detail-metric-avg" title={avg.tooltip}>{avg.line}</span> : null}
+    </div>
     {(shutdown !== undefined || slowdown !== undefined) && (
       <div className="detail-temp-thresholds">
         {slowdown !== undefined && <span>SL: {slowdown}°C</span>}
@@ -108,6 +108,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
   agentName,
   agentStatus,
   driverVersion,
+  averages,
   settings,
   onClose,
 }) => {
@@ -195,6 +196,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   status={evaluateStatus(gpu.coreTemp, settings.thresholds.core.warn, settings.thresholds.core.critical)}
                   shutdown={gpu.tempShutdown}
                   slowdown={gpu.tempSlowdown}
+                  avg={avgDisplay(averages?.coreTemp, { unit: '°C' })}
                 />
                 <TempRow
                   label="Junction"
@@ -202,6 +204,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   status={evaluateStatus(gpu.junctionTemp, settings.thresholds.junction.warn, settings.thresholds.junction.critical)}
                   shutdown={gpu.tempShutdown}
                   slowdown={gpu.tempSlowdown}
+                  avg={avgDisplay(averages?.junctionTemp, { unit: '°C' })}
                 />
                 <TempRow
                   label="VRAM"
@@ -209,6 +212,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   status={evaluateStatus(gpu.vramTemp, settings.thresholds.vram.warn, settings.thresholds.vram.critical)}
                   shutdown={gpu.tempShutdown}
                   slowdown={gpu.tempSlowdown}
+                  avg={avgDisplay(averages?.vramTemp, { unit: '°C' })}
                 />
               </div>
             </GpuSection>
@@ -222,6 +226,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   max={100}
                   unit="%"
                   status="normal"
+                  avg={gpu.fanSpeed !== undefined ? avgDisplay(averages?.fanSpeed, { unit: '%' }) : null}
                 />
                 <MetricBar
                   label="GPU Clock"
@@ -229,6 +234,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   max={Math.max((gpu.gpuClockMHz || 1) * 1.3, 2000)}
                   unit=" MHz"
                   status="normal"
+                  avg={gpu.gpuClockMHz !== undefined ? avgDisplay(averages?.gpuClockMHz, { unit: 'MHz' }) : null}
                 />
                 <MetricBar
                   label="Memory Clock"
@@ -236,6 +242,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   max={Math.max((gpu.memClockMHz || 1) * 1.3, 2000)}
                   unit=" MHz"
                   status="normal"
+                  avg={gpu.memClockMHz !== undefined ? avgDisplay(averages?.memClockMHz, { unit: 'MHz' }) : null}
                 />
                 <MetricRow
                   label="P-State"
@@ -255,6 +262,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   max={100}
                   unit="%"
                   status={getGpuUtilizationStatus(gpu.gpuUtilization)}
+                  avg={avgDisplay(averages?.gpuUtilization, { unit: '%' })}
                 />
                 <MetricBar
                   label="Memory Used"
@@ -263,6 +271,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   unit=" GB"
                   status={getMemoryStatus(gpu.memoryUsed, gpu.memoryTotal)}
                   hint={`${((gpu.memoryUsed / gpu.memoryTotal) * 100).toFixed(1)}% of ${(gpu.memoryTotal / GB).toFixed(1)} GB`}
+                  avg={avgDisplay(averages?.memoryUsed, { unit: 'GB', decimals: 1, scale: 1 / GB })}
                 />
               </div>
             </GpuSection>
@@ -277,6 +286,7 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                   unit=" W"
                   status={getPowerStatus(gpu.powerUsage, gpu.powerCapW)}
                   hint={gpu.powerCapW ? `Cap: ${gpu.powerCapW.toFixed(0)}W` : undefined}
+                  avg={avgDisplay(averages?.powerUsage, { unit: 'W' })}
                 />
               </div>
             </GpuSection>

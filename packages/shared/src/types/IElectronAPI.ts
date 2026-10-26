@@ -1,6 +1,7 @@
 import type { FetchResult } from './AgentData';
 import type { IAgent } from './IAgent';
 import type { IGpu } from './IGpu';
+import type { IGpuAverages } from './IGpuAverages';
 import type { IpcEventMap, IpcInvokeMap } from './IpcChannels';
 
 /**
@@ -15,6 +16,8 @@ export interface GpuDataPayload {
   lastFetchTimestamp: Array<[string, number]>;
   statusChangedAt: Array<[string, number]>;
   fetchResult: Array<[string, FetchResult]>;
+  /** Rolling 1/5/10-min averages, index-aligned with each agent's `gpus` array. */
+  averages: Array<{ agentId: string, gpus: IGpuAverages[] }>;
 }
 
 /**

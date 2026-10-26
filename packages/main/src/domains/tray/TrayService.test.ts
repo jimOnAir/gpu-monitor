@@ -46,6 +46,7 @@ function buildData(gpus: IGpu[]): AgentData {
     statusChangedAt: new Map(),
     fetchResult: new Map(),
     prevAgentStatus: new Map(),
+    averages: new Map(),
   };
 }
 

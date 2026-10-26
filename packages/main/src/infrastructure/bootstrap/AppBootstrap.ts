@@ -8,6 +8,7 @@ import type { INotificationService } from '../../domains/notifications/INotifica
 import { NotificationService } from '../../domains/notifications/NotificationService';
 import { AgentPoller } from '../../domains/polling/AgentPoller';
 import type { IPollingService } from '../../domains/polling/IPollingService';
+import { MetricsHistoryService } from '../../domains/polling/MetricsHistoryService';
 import { PollingService } from '../../domains/polling/PollingService';
 import { StaleDetector } from '../../domains/polling/StaleDetector';
 import type { IDialogAdapter } from '../../domains/recovery/IDialogAdapter';
@@ -109,10 +110,12 @@ export class AppBootstrap {
 
     const agentPoller = new AgentPoller(this.logger, this.electronAdapter.http);
     const staleDetector = new StaleDetector();
+    const metricsHistory = new MetricsHistoryService();
     this.pollingService = new PollingService(
       this.logger,
       agentPoller,
       staleDetector,
+      metricsHistory,
       () => null,
     );
 
@@ -144,8 +147,8 @@ export class AppBootstrap {
       },
       onExit: () => {
         this.logger.info('Tray: Exit clicked — quitting app');
-        this.pollingService.stopPolling();
-        this.windowService.getMainWindow()?.close();
+        // before-quit (LifecycleService) sets willQuit + stops polling,
+        // then app.quit() closes the windows — onClose lets them destroy.
         this.appLifecycle.quit();
       },
     });

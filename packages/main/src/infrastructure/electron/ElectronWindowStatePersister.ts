@@ -23,6 +23,8 @@ export class ElectronWindowStatePersister implements IWindowStatePersister {
   }
 
   save(window: IWindowHandle): void {
-    this.stateKeeper.manage(window as unknown as BrowserWindow);
+    // saveState() reads getBounds/isMaximized/isMinimized/isFullScreen off the handle —
+    // never manage(): that registers BrowserWindow event listeners the domain handle doesn't have.
+    this.stateKeeper.saveState(window as unknown as BrowserWindow);
   }
 }

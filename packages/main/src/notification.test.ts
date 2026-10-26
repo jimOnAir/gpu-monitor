@@ -64,6 +64,7 @@ function buildData(
     statusChangedAt: new Map(),
     fetchResult: new Map(),
     prevAgentStatus,
+    averages: new Map(),
   };
 }
 

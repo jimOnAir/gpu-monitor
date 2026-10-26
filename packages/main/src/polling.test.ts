@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { AgentPoller } from './domains/polling/AgentPoller';
 import type { IHttpAdapter } from './domains/polling/IHttpAdapter';
+import { MetricsHistoryService } from './domains/polling/MetricsHistoryService';
 import { PollingService } from './domains/polling/PollingService';
 import { StaleDetector } from './domains/polling/StaleDetector';
 
@@ -120,7 +121,7 @@ describe('PollingService', () => {
       updateTrayFromData: vi.fn(),
       pushToRenderer: vi.fn(),
     };
-    service = new PollingService(mockLogger, poller, new StaleDetector(), () => null);
+    service = new PollingService(mockLogger, poller, new StaleDetector(), new MetricsHistoryService(), () => null);
     service.registerHandlers(handlers);
   });
 
@@ -194,6 +195,54 @@ describe('PollingService', () => {
     const data = service.getAgentData();
     expect(data.agents[0].status).toBe(EAgentStatus.Offline);
     expect(data.agents[0].lastError).toBe('GPU data failed validation');
+  });
+
+  it('records rolling averages for validated GPUs on a successful cycle', async () => {
+    getJson.mockImplementation(async (url: string) => {
+      if (url.endsWith('/gpu')) {
+        return Promise.resolve(VALID_GPU_RESPONSE);
+      }
+
+      return Promise.resolve({ status: 'ok' });
+    });
+
+    service.startPolling(buildSettings());
+    await vi.advanceTimersByTimeAsync(100);
+
+    const averages = service.getAgentData().averages.get('test');
+    expect(averages).toBeDefined();
+    expect(averages?.[0].coreTemp.m1).toBe(VALID_GPU_RESPONSE.gpus[0].coreTemp);
+    // junctionTemp is a number here (65) and the sensor is live → averaged
+    expect(averages?.[0].junctionTemp.m1).toBe(65);
+    // optional metric absent from the agent response → stays null
+    expect(averages?.[0].fanSpeed.m1).toBeNull();
+  });
+
+  it('does not overwrite averages when a later poll fails (freeze while stale/offline)', async () => {
+    getJson.mockImplementation(async (url: string) => {
+      if (url.endsWith('/gpu')) {
+        return Promise.resolve(VALID_GPU_RESPONSE);
+      }
+
+      return Promise.resolve({ status: 'ok' });
+    });
+
+    service.startPolling(buildSettings());
+    await vi.advanceTimersByTimeAsync(100);
+    const first = service.getAgentData().averages.get('test');
+    expect(first?.[0].coreTemp.m1).toBe(60);
+
+    getJson.mockImplementation(async (url: string) => {
+      if (url.endsWith('/gpu')) {
+        return Promise.resolve(null);
+      }
+
+      return Promise.resolve(null);
+    });
+    await service.refreshAgents();
+
+    const frozen = service.getAgentData().averages.get('test');
+    expect(frozen).toBe(first);
   });
 
   it('refreshAgents runs a cycle on demand', async () => {

@@ -2,6 +2,7 @@ import type { EAgentStatus } from '../enums/EAgentStatus';
 
 import type { IAgent } from './IAgent';
 import type { IGpu } from './IGpu';
+import type { IGpuAverages } from './IGpuAverages';
 
 /**
  * Fetch result state for an individual agent poll cycle.
@@ -22,4 +23,6 @@ export interface AgentData {
   fetchResult: Map<string, FetchResult>;
   /** Previous agent status before the current poll cycle — used for transition detection. */
   prevAgentStatus: Map<string, EAgentStatus>;
+  /** Rolling 1/5/10-min averages, index-aligned with `gpus`. Frozen while an agent is stale/offline. */
+  averages: Map<string, IGpuAverages[]>;
 }

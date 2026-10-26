@@ -35,6 +35,7 @@ src/
 │   │   ├── IPollingService.ts           # Interface
 │   │   ├── AgentData.ts                 # PollingHandlers type (AgentData from shared)
 │   │   ├── AgentPoller.ts               # HTTP fetch + classifyResult (pure classification)
+│   │   ├── MetricsHistoryService.ts     # In-memory 10-min sample buffer; 1/5/10-min averages
 │   │   ├── PollingService.ts            # Owns active settings + the poll cycle (runCycle)
 │   │   └── StaleDetector.ts             # Stale detection (15s threshold)
  │   ├── recovery/
@@ -91,10 +92,12 @@ src/
 - **GPU data validation**: Zod schemas in `gpu-validation.ts` — validates raw agent responses before processing (`validateGpuResponse()`); `junctionTemp`/`vramTemp` accept `number | null`
 - **Agent polling**: `PollingService` owns the active settings and the poll cycle (`runCycle`: fetch → classify → stale → notify → tray → push). All entry points (poll interval, stale-check interval, `refreshAgents()`) run the same cycle. `AgentPoller` fetches `/gpu` + `/health` in parallel (timeout enforced by `IHttpAdapter`); `classifyResult()` → `validateGpuResponse()` pipeline classifies as `ok` / `fetch-failed` / `health-failed` / `invalid`
 - **Stale detection**: runs every 5s as part of the poll cycle, independent of the polling interval
+- **Rolling averages**: on every successful poll, `PollingService` calls `MetricsHistoryService.record()` (timestamped samples, pruned beyond 10 min) and stores computed 1/5/10-min means in `AgentData.averages` (keyed per agent, index-aligned with `gpus`). Simple mean of samples inside each window; null samples skipped; window without samples → null. Nothing recorded while an agent is stale/offline, so shown averages freeze. In-memory only — `startPolling()` resets it
 - **NotificationService**: self-contained (constructor: logger + dispatcher) — evaluates per-GPU temperature thresholds via shared `evaluateStatus()`, tracks per-metric previous state (`agentId:metric` keys), per-agent warned flags, and per-trigger cooldowns; fires through `INotificationDispatcher` adapter. Metrics with `null` temperature (sensor unavailable) are skipped entirely — no notification, no recovery, previous state retained
 - **Threshold evaluation**: single source of truth is `evaluateStatus()` / `worstStatus()` in `@gpu-monitor/shared` — consumed by tray, notifications, and renderer. One label vocabulary: `normal | warning | danger`
 - Tray icon and tooltip update are internal to main process (no IPC needed); tray uses per-metric evaluation via shared `evaluateStatus()` so junction/vram critical temps override core-only normal state; null temps render `--` in the tooltip and never escalate the icon
-- **Window/tray handles**: `IWindowHandle` and `ITrayHandle` are domain abstractions — `IWindowService` and `ITrayService` contain no electron types; the Electron adapters wrap `BrowserWindow`/`Tray` to satisfy them
+- **Window/tray handles**: `IWindowHandle` and `ITrayHandle` are domain abstractions — `IWindowService` and `ITrayService` contain no electron types; the Electron adapters wrap `BrowserWindow`/`Tray` to satisfy them. `IWindowHandle` also carries geometry reads (`getBounds`/`isMaximized`/`isMinimized`/`isFullScreen`) so the persister can snapshot bounds; `ElectronWindowStatePersister.save()` must use `stateKeeper.saveState(handle)` — **never `manage()`**, which calls `win.on()` the handle doesn't have (runtime TypeError on hide/quit). `ElectronWindowFactory` maps each handle back to its native `BrowserWindow` in a `WeakMap` to resolve child-window `parent` linkage
+- **Quit flow**: tray Exit only calls `app.quit()`; `LifecycleService`'s `before-quit` sets `willQuit` + stops polling, then the `onClose` handlers snapshot state and **let the window close** — `preventDefault()` must happen only while `willQuit` is false (close-to-tray hide). A `preventDefault()` during quit permanently stalls `app.quit()`
 - **No module-level singletons** — tray, windows, and polling state are instance fields on their services
 - **No callback injection anti-pattern** — `setPollingCallbacks()` is replaced by `PollingService.registerHandlers()` with typed interface
 
@@ -124,7 +127,7 @@ Build icon (`build/icons/icon.png`) is 256×256, loaded by `ElectronAdapter.buil
 Notifications respect `settings.notifications.enabled` and use per-trigger cooldowns keyed by `(type, agentId, metric)`.
 
 ### IPC Events
-- **Main → Renderer**: `gpu-data-update` — pushes full agent+GPU state on every poll cycle. Payload shape: `GpuDataPayload` (from `@gpu-monitor/shared`)
+- **Main → Renderer**: `gpu-data-update` — pushes full agent+GPU state plus 1/5/10-min rolling averages on every poll cycle. Payload shape: `GpuDataPayload` (from `@gpu-monitor/shared`)
 - **Main → Renderer**: `update-available` / `update-downloaded` — auto-updater events (version + release notes). Consumed by `UpdateBanner` in the renderer.
 - **Renderer → Main**: `get-settings`, `save-settings`, `on-window-close`, `open-preferences`, `close-preferences` — types defined in `@gpu-monitor/shared` (`IElectronAPI`)
 - Tray menu "Refresh Agents" calls polling directly (no IPC round-trip)

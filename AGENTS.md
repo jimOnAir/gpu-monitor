@@ -108,13 +108,14 @@ npm run package                      # build + electron-builder --linux AppImage
 - **Notifications in main only**: `NotificationService` (self-contained: logger + dispatcher) evaluates per-metric thresholds with per-metric previous state and per-trigger cooldowns, fires `Electron.Notification`. Renderer is pure display.
 - **Tray icon uses per-metric evaluation** via shared `evaluateStatus()`: junction/vram critical temps override core-only normal state; null temps render `--` and never escalate. 4 states: default(gray), normal(green), warning(yellow), critical(red).
 - **Poll cycle**: `PollingService` owns the active settings and the cycle (fetch → classify → stale → notify → tray → push). All entry points (interval, stale check, manual refresh) run the same `runCycle()`.
+- **Rolling averages**: `MetricsHistoryService` (main, domains/polling) stores 10-minute in-memory samples per agent/GPU on successful polls and computes 1/5/10-min means (`IGpuAverages` in shared). Display-only in the renderer; tray and notifications keep evaluating instantaneous values. Averages freeze while an agent is stale; nothing persists across restarts.
 - **Agent polling via Node.js `http`**: main process fetches, not renderer. `Promise.allSettled` for parallel agent polling; timeout enforced by `IHttpAdapter`.
 - **Settings validation**: Zod schema in `settings.ts`. Agent URLs validated via `agentUrlSchema` (http/https only, rejects `file://`).
 - **Preload** (`preload.ts`): `contextBridge` bridge exposing `IElectronAPI` types from `@gpu-monitor/shared`.
 
 ## IPC
 
-- **Main → Renderer**: `gpu-data-update` — full agent+GPU state, every poll cycle.
+- **Main → Renderer**: `gpu-data-update` — full agent+GPU state plus 1/5/10-min rolling averages, every poll cycle.
 - **Renderer → Main**: `get-settings`, `save-settings`, `on-window-close`, `open-preferences`, `close-preferences`.
 - Tray "Refresh Agents" calls polling directly (no IPC).
 
@@ -141,7 +142,7 @@ npm run package                      # build + electron-builder --linux AppImage
 
 ### Issue tracker
 
-Issues and specs live as GitHub issues via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues and tasks live as local Markdown ticket files under `.scratch/<feature-slug>/issues/` (gitignored). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

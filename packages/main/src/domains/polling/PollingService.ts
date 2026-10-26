@@ -6,6 +6,7 @@ import type { Logger } from '../../logger';
 import type { PollingHandlers } from './AgentData';
 import type { AgentPoller } from './AgentPoller';
 import type { IPollingService } from './IPollingService';
+import type { MetricsHistoryService } from './MetricsHistoryService';
 import type { StaleDetector } from './StaleDetector';
 import { STALE_CHECK_INTERVAL_MS } from './StaleDetector';
 
@@ -33,12 +34,14 @@ export class PollingService implements IPollingService {
     statusChangedAt: new Map(),
     fetchResult: new Map(),
     prevAgentStatus: new Map(),
+    averages: new Map(),
   };
 
   constructor(
     private readonly logger: Logger,
     private readonly agentPoller: AgentPoller,
     private readonly staleDetector: StaleDetector,
+    private readonly metricsHistory: MetricsHistoryService,
     private readonly handlersProvider: () => PollingHandlers | null,
   ) {}
 
@@ -62,7 +65,9 @@ export class PollingService implements IPollingService {
       statusChangedAt: new Map(),
       fetchResult: new Map(),
       prevAgentStatus: new Map(),
+      averages: new Map(),
     };
+    this.metricsHistory.reset();
 
     void this.runCycle();
 
@@ -139,6 +144,8 @@ export class PollingService implements IPollingService {
       const ts = classified.gpus.timestamp ? classified.gpus.timestamp * 1000 : Date.now();
       this.agentData.lastUpdate.set(agent.id, ts);
       this.agentData.statusChangedAt.set(agent.id, Date.now());
+      this.metricsHistory.record(agent.id, classified.gpus.gpus, ts);
+      this.agentData.averages.set(agent.id, this.metricsHistory.getAverages(agent.id, classified.gpus.gpus));
       this.setAgentStatus(agent.id, EAgentStatus.Online, undefined);
     } else {
       this.setAgentStatus(agent.id, EAgentStatus.Offline, FETCH_ERROR_MESSAGES[classified.status]);

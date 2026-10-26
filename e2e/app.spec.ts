@@ -16,7 +16,7 @@ test.describe('App Structure', () => {
     await expect(page.locator('#root')).toBeVisible();
 
     // Check title
-    await expect(page.locator('title')).toHaveText('GPU Monitor');
+    await expect(page).toHaveTitle('GPU Monitor');
   });
 
   test('CSP is configured', async ({ page }) => {
@@ -30,8 +30,8 @@ test.describe('App Structure', () => {
   test('bundle.js is loaded with nonce', async ({ page }) => {
     await page.goto('file://' + process.cwd() + '/packages/renderer/dist/index.html');
 
-    // Check script tag with nonce exists
-    const scriptTag = page.locator('script[src="bundle.js"][nonce]');
+    // Check script tag with nonce exists (webpack emits main-bundle.js / settings-bundle.js)
+    const scriptTag = page.locator('script[src="main-bundle.js"][nonce]');
     await expect(scriptTag).toHaveCount(1);
   });
 });

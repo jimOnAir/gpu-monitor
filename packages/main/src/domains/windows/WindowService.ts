@@ -55,15 +55,15 @@ export class WindowService implements IWindowService {
         this.mainWindow?.send('WINDOW_BLUR');
       },
       onClose: (event) => {
-        // Save position before hiding — the persister only auto-saves on real close,
-        // but we preventDefault to hide instead of close, so we save manually.
         this.mainWindowStatePersister.save(this.mainWindow as IWindowHandle);
-        event.preventDefault();
         if (this.willQuit) {
+          // Real quit — let the window close; preventDefault here would stall app.quit()
           this.mainWindow = null;
 
           return;
         }
+        // Close-to-tray: hide instead of destroy
+        event.preventDefault();
         this.mainWindow?.hide();
       },
       onWillNavigate: (event, url) => {
@@ -141,6 +141,7 @@ export class WindowService implements IWindowService {
       lastFetchTimestamp: Array.from(data.lastFetchTimestamp.entries()),
       statusChangedAt: Array.from(data.statusChangedAt.entries()),
       fetchResult: Array.from(data.fetchResult.entries()),
+      averages: Array.from(data.averages.entries()).map(([id, gpus]) => ({ agentId: id, gpus })),
     });
   }
 
@@ -170,6 +171,12 @@ export class WindowService implements IWindowService {
       },
       onClose: (event) => {
         this.preferencesWindowStatePersister.save(this.preferencesWindow as IWindowHandle);
+        if (this.willQuit) {
+          // Real quit — let the window close; preventDefault here would stall app.quit()
+          this.preferencesWindow = null;
+
+          return;
+        }
         event.preventDefault();
         this.preferencesWindow = null;
       },

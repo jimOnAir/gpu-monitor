@@ -4,27 +4,6 @@
  */
 
 import { defineConfig } from '@playwright/test';
-import { spawn } from 'child_process';
-import { join } from 'path';
-
-const APP_DIR = join(__dirname, '..');
-
-const startApp = () => {
-  // Build the app first
-  spawn('npm', ['run', 'build'], {
-    cwd: APP_DIR,
-    stdio: 'ignore',
-  });
-
-  // Start the Electron app
-  const proc = spawn('electron', ['packages/main/dist/electron-app/main.js'], {
-    cwd: APP_DIR,
-    stdio: 'ignore',
-    env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
-  });
-
-  return proc;
-};
 
 export default defineConfig({
   testDir: './e2e',
@@ -45,15 +24,4 @@ export default defineConfig({
       },
     },
   ],
-  // Launch Electron app before tests, tear down after
-  globalSetup: async (config) => {
-    const appProcess = startApp();
-    // Wait for app to load
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    (config as any).globalSetupComplete = { appProcess };
-    return { appProcess };
-  },
-  globalTeardown: async () => {
-    // Teardown is handled in the test file
-  },
 });

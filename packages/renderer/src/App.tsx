@@ -34,6 +34,7 @@ export const App: React.FC = () => {
     fetchResult: new Map(),
     lastFetchTimestamp: new Map(),
     statusChangedAt: new Map(),
+    averages: new Map(),
   });
   const [selectedGpu, setSelectedGpu] = useState<{
     agentId: string,
@@ -58,6 +59,7 @@ export const App: React.FC = () => {
           lastFetchTimestamp: new Map(payload.lastFetchTimestamp),
           statusChangedAt: new Map(payload.statusChangedAt),
           fetchResult: new Map(payload.fetchResult),
+          averages: new Map(payload.averages.map((a) => [a.agentId, a.gpus])),
         });
       });
 
@@ -86,8 +88,14 @@ export const App: React.FC = () => {
     <div className={`app${!isFocused ? ' unfocused' : ''}`}>
       {/* Custom Title Bar */}
       <div className="title-bar">
-        { }
-        <div className="title-bar-text">🔥 GPU Monitor</div>
+        <div className="title-bar-text">
+          <svg className="title-bar-icon" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+            <path d="M2.2 11.5a6.2 6.2 0 1 1 11.6 0" />
+            <line x1="8" y1="11" x2="11" y2="6.5" />
+            <circle cx="8" cy="11" r="1" fill="currentColor" stroke="none" />
+          </svg>
+          GPU Monitor
+        </div>
         <div className="title-bar-controls">
           <button className="control-btn" onClick={() => {
             setShowDebug(!showDebug);
@@ -126,6 +134,7 @@ export const App: React.FC = () => {
                   agentId={agentId}
                   gpuData={gpuData}
                   agent={agentState.agents.find((a) => a.id === agentId)}
+                  averages={agentState.averages.get(agentId)}
                   settings={settings}
                   onGpuClick={handleGpuClick}
                 />
@@ -169,6 +178,7 @@ export const App: React.FC = () => {
             agentName={selectedGpu.agentName}
             agentStatus={agent?.status || EAgentStatus.Offline}
             driverVersion={driverVersion}
+            averages={agentState.averages.get(selectedGpu.agentId)?.[selectedGpu.index]}
             settings={settings}
             onClose={handleCloseGpuDetail}
           />
@@ -191,11 +201,12 @@ interface AgentSectionProps {
   agentId: string;
   gpuData: Array<{ gpu: import('@gpu-monitor/shared').IGpu, agentName: string }>;
   agent: IAgent | undefined;
+  averages?: Array<import('@gpu-monitor/shared').IGpuAverages>;
   settings: ISettings;
   onGpuClick: (agentId: string, agentName: string, gpu: import('@gpu-monitor/shared').IGpu, index: number) => void;
 }
 
-export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, agent, settings, onGpuClick }) => (
+export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, agent, averages, settings, onGpuClick }) => (
   <div className="agent-section">
     <div className="agent-section-header">
       <h3>{gpuData[0].agentName}</h3>
@@ -205,11 +216,12 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, ag
       </span>
     </div>
     <div className="gpu-grid">
-      {gpuData.map(({ gpu }) => (
+      {gpuData.map(({ gpu }, i) => (
         <GpuCard
           key={`${agentId}-gpu-${gpu.index}`}
           gpu={gpu}
           index={gpu.index}
+          averages={averages?.[i]}
           settings={settings}
           onClick={() => {
             onGpuClick(agentId, gpuData[0].agentName, gpu, gpu.index);
