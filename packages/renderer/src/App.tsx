@@ -7,7 +7,7 @@ import { Footer } from './components/Footer';
 import { GpuCard } from './components/GpuCard';
 import { GpuDetailModal } from './components/GpuDetailModal';
 import { UpdateBanner } from './components/UpdateBanner';
-import { getDriverVersion, getGpusByAgent, getLastUpdateTime, getUnreachableAgents } from './domains/dashboard/DashboardService';
+import { getGpusByAgent, getLastUpdateTime, getUnreachableAgents } from './domains/dashboard/DashboardService';
 import type { AgentState } from './types/AgentState';
 import { getAgentStatusLabel } from './utils/statusDisplay';
 import { useSettings } from './utils/useSettings';
@@ -80,9 +80,6 @@ export const App: React.FC = () => {
   const gpusByAgent = getGpusByAgent(agentState);
   const unreachableAgents = getUnreachableAgents(agentState);
   const lastUpdate = getLastUpdateTime(agentState);
-
-  // Driver version (all GPUs on one machine share the same driver)
-  const driverVersion = getDriverVersion(agentState);
 
   return (
     <div className={`app${!isFocused ? ' unfocused' : ''}`}>
@@ -177,7 +174,6 @@ export const App: React.FC = () => {
             gpuIndex={selectedGpu.index}
             agentName={selectedGpu.agentName}
             agentStatus={agent?.status || EAgentStatus.Offline}
-            driverVersion={driverVersion}
             averages={agentState.averages.get(selectedGpu.agentId)?.[selectedGpu.index]}
             settings={settings}
             onClose={handleCloseGpuDetail}
@@ -211,6 +207,9 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ agentId, gpuData, ag
     <div className="agent-section-header">
       <h3>{gpuData[0].agentName}</h3>
       <span className="agent-endpoint">{agent?.url || ''}</span>
+      {gpuData[0].gpu.driverVersion && (
+        <span className="agent-driver">Driver: {gpuData[0].gpu.driverVersion}</span>
+      )}
       <span className={`agent-status-badge ${agent?.status || ''}`}>
         {getAgentStatusLabel(agent?.status)}
       </span>

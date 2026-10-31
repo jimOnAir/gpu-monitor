@@ -144,3 +144,28 @@ describe('GpuDetailModal averages micro-lines', () => {
     expect(screen.queryAllByTitle(/1m:/)).toHaveLength(0);
   });
 });
+
+describe('GpuDetailModal driver version', () => {
+  it('shows the GPU\'s own driver version', () => {
+    renderModal({ ...fullGpu, driverVersion: '610.43.03' });
+    expect(screen.getByText('Driver: 610.43.03')).toBeInTheDocument();
+  });
+
+  it('renders a different GPU\'s different driver, not another host\'s', () => {
+    // Regression: the old App-level global always fed the first agent's driver
+    // into every modal. Each modal must derive from its own GPU object.
+    renderModal({ ...fullGpu, driverVersion: '615.71.09' });
+    expect(screen.getByText('Driver: 615.71.09')).toBeInTheDocument();
+    expect(screen.queryByText('Driver: 610.43.03')).toBeNull();
+  });
+
+  it('hides the driver line when the GPU reports no driver version', () => {
+    renderModal(fullGpu);
+    expect(screen.queryByText(/Driver:/)).toBeNull();
+  });
+
+  it('hides the driver line when the driver version is an empty string', () => {
+    renderModal({ ...fullGpu, driverVersion: '' });
+    expect(screen.queryByText(/Driver:/)).toBeNull();
+  });
+});

@@ -12,7 +12,6 @@ interface GpuDetailModalProps {
   gpuIndex: number;
   agentName: string;
   agentStatus: EAgentStatus;
-  driverVersion?: string;
   averages?: IGpuAverages;
   settings: ISettings;
   onClose: () => void;
@@ -107,7 +106,6 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
   gpuIndex,
   agentName,
   agentStatus,
-  driverVersion,
   averages,
   settings,
   onClose,
@@ -141,8 +139,8 @@ export const GpuDetailModal: React.FC<GpuDetailModalProps> = ({
                 {getAgentStatusLabel(agentStatus)}
               </span>
               <span className="detail-agent-source">{agentName}</span>
-              {driverVersion && (
-                <span className="detail-driver">Driver: {driverVersion}</span>
+              {gpu.driverVersion && (
+                <span className="detail-driver">Driver: {gpu.driverVersion}</span>
               )}
               {gpu.perfState !== undefined && gpu.perfState !== null && (
                 <span className="detail-pstate">

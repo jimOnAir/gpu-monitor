@@ -2,6 +2,7 @@
   "private": true,
   "version": "0.1.0",
   "name": "gpu-monitor",
+  "desktopName": "gpu-monitor",
   "description": "GPU monitoring Electron app with remote C/Go agents",
   "author": "",
   "license": "MIT",
@@ -68,7 +69,8 @@
     "linux": {
       "target": "AppImage",
       "category": "Utility",
-      "icon": "build/icons/icon.png"
+      "icon": "build/icons/icon.png",
+      "syncDesktopName": true
     },
     "mac": {
       "target": "dmg",

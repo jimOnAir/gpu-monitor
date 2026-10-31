@@ -180,6 +180,50 @@ describe('AgentSection', () => {
     expect(urlElement).toBeInTheDocument();
     expect(urlElement?.textContent).toBe('');
   });
+
+  it('renders the agent driver version in the header when present', () => {
+    render(
+      <AgentSection
+        agentId="agent-1"
+        gpuData={[{ gpu: { ...mockGpu, driverVersion: '615.71.09' }, agentName: 'Test Agent' }]}
+        agent={mockAgent}
+        settings={mockSettings}
+        onGpuClick={() => {}}
+      />,
+    );
+
+    const driverElement = document.querySelector('.agent-driver');
+    expect(driverElement).toBeInTheDocument();
+    expect(driverElement?.textContent).toBe('Driver: 615.71.09');
+  });
+
+  it('omits the driver span when the agent reports no driver version', () => {
+    render(
+      <AgentSection
+        agentId="agent-1"
+        gpuData={mockGpuData}
+        agent={mockAgent}
+        settings={mockSettings}
+        onGpuClick={() => {}}
+      />,
+    );
+
+    expect(document.querySelector('.agent-driver')).toBeNull();
+  });
+
+  it('omits the driver span when the driver version is an empty string', () => {
+    render(
+      <AgentSection
+        agentId="agent-1"
+        gpuData={[{ gpu: { ...mockGpu, driverVersion: '' }, agentName: 'Test Agent' }]}
+        agent={mockAgent}
+        settings={mockSettings}
+        onGpuClick={() => {}}
+      />,
+    );
+
+    expect(document.querySelector('.agent-driver')).toBeNull();
+  });
 });
 
 describe('UnreachableAgent', () => {

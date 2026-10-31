@@ -32,7 +32,7 @@ App.tsx (root orchestrator)
 ├── Main Content
 │   ├── gpu-container
 │   │   └── For each agent:
-│   │       ├── agent-section-header (name, endpoint URL, status badge — pill with status dot)
+│   │       ├── agent-section-header (name, endpoint URL, driver version when reported, status badge — pill with status dot)
 │   │       └── gpu-grid (2-column responsive grid)
 │   │           └── GpuCard (clickable → opens GpuDetailModal)
 │   └── Empty state (no GPU data)
@@ -48,8 +48,8 @@ SettingsApp.tsx (separate Preferences window, own settings.html entry)
 **Key components:**
 - **GpuCard** — compact summary (temps, utilization, power). Click opens detail modal. Temp status via shared `evaluateStatus()` against `settings.thresholds`.
 - **UpdateBanner** — subscribes to `onUpdateAvailable`/`onUpdateDownloaded` IPC events; shows a dismissible banner above the footer.
-- **GpuDetailModal** — full GPU breakdown (identity, temps w/ thresholds, performance, utilization, power). Resolves GPU data live from `agentState` on every render.
-- **Dashboard functions** — cross-agent aggregation (groups by agent, unreachable list, timestamps, driver version).
+- **GpuDetailModal** — full GPU breakdown (identity, temps w/ thresholds, performance, utilization, power); header meta shows the GPU's *own* `driverVersion` (never a cross-agent global — hosts can run different drivers). Resolves GPU data live from `agentState` on every render.
+- **Dashboard functions** — cross-agent aggregation (groups by agent, unreachable list, timestamps).
 
 **State flow:**
 1. Main process polls agents, evaluates notifications, pushes `gpu-data-update` to renderer via IPC
@@ -58,7 +58,7 @@ SettingsApp.tsx (separate Preferences window, own settings.html entry)
 4. Modal resolves GPU live from `agentState.gpus` → updates automatically as data refreshes
 
 ### Domain Services
-- `domains/dashboard/DashboardService.ts` — pure functions: `isReachable`, `getGpusByAgent`, `getUnreachableAgents`, `getLastUpdateTime`, `getDriverVersion`
+- `domains/dashboard/DashboardService.ts` — pure functions: `isReachable`, `getGpusByAgent`, `getUnreachableAgents`, `getLastUpdateTime`
 
 ### Utilities
 - `utils/statusDisplay.ts` — display vocabulary: `getAgentStatusLabel`, `getStatusColor`, `formatValue`

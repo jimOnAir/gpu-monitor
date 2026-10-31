@@ -248,6 +248,16 @@ body.settings-body {
   white-space: nowrap;
 }
 
+.agent-driver {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+  margin-left: var(--spacing-sm);
+  margin-right: var(--spacing-sm);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .agent-status-badge {
   display: inline-flex;
   align-items: center;

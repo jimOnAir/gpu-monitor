@@ -133,6 +133,7 @@ npm run package                      # build + electron-builder --linux AppImage
 - **Tray icon paths**: from `dist/electron-app/`, assets are at `../../assets/`. Build icon is 256×256 from project root.
 - **CSP nonces in renderer**: generated at webpack build time. Two entries (`main` + `settings`) each get their own nonce.
 - **Settings modal is a separate window**: `settings.html` with its own webpack entry, separate CSP nonce, separate preload bridge.
+- **AppImage window association**: top-level `desktopName` in `package.json` (not in `build`) drives Electron app_id/WM_CLASS and the embedded `gpu-monitor.desktop` (`linux.syncDesktopName: true`); keep it matching `packages/main/scripts/gpu-monitor.desktop`.
 - **Agent URLs in settings**: validated at save time. `file://` and other schemes rejected.
 - **No module-level singletons** in main process — tray, windows, polling state are instance fields on services.
 - **No default params in service constructors** — every dependency explicit.

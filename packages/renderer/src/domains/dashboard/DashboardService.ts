@@ -59,16 +59,3 @@ export function getLastUpdateTime(state: AgentState): number {
   return latest;
 }
 
-/**
- * Get the first non-undefined driver version across all agents.
- * All GPUs on one machine share the same driver.
- */
-export function getDriverVersion(state: AgentState): string | undefined {
-  for (const gpus of state.gpus.values()) {
-    if (gpus.length > 0 && gpus[0].driverVersion) {
-      return gpus[0].driverVersion;
-    }
-  }
-
-  return undefined;
-}
