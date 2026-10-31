@@ -104,7 +104,8 @@ npm run package                      # build + electron-builder --linux AppImage
 
 - **Domain/adapter pattern in main**: `domains/` has no Electron imports. `infrastructure/electron/` adapters bridge to `electron` module. `AppBootstrap` is the composition root (wiring only — no behavior). Domain interfaces never expose electron types: `IWindowHandle` / `ITrayHandle` are the domain abstractions.
 - **Threshold evaluation**: single source of truth is `evaluateStatus()` / `worstStatus()` in `@gpu-monitor/shared` — consumed by tray, notifications, and renderer. One label vocabulary: `normal | warning | danger`. The C agent reports raw temperatures only; junction/vram may be `null` when a sensor is unavailable (Blackwell hotspot needs root) — `evaluateStatus(null)` never escalates.
-- **Validation pipeline**: raw agent HTTP responses → `classifyResult()` → `validateGpuResponse()` (Zod) → stored/used. Never skip validation. Classification: `ok` / `fetch-failed` / `health-failed` / `invalid`.
+- **Validation pipeline**: raw agent HTTP responses → `classifyResult()` → `validateGpuResponse()` (Zod) → stored/used. Never skip validation. Classification: `ok` / `fetch-failed` / `health-failed` / `invalid`. `validateGpuResponse()` normalizes implausible junction/VRAM readings (outside 1 ≤ t < 255 °C) to `null` via `normalizeSensorTemp()` — see `docs/adr/0001-implausible-sensor-readings-normalized-to-null.md` and `GLOSSARY.md`.
+- **Agent versioning**: the C daemon exposes `AGENT_VERSION` (human-bumped semver) via `--version`, `/health` (`version`), and `/gpu` (`agentVersion`, optional — absent on pre-1.0.0 agents). Bump only on protocol/behavior change; UI display is a follow-up (`.scratch/agent-version-ui/`).
 - **Notifications in main only**: `NotificationService` (self-contained: logger + dispatcher) evaluates per-metric thresholds with per-metric previous state and per-trigger cooldowns, fires `Electron.Notification`. Renderer is pure display.
 - **Tray icon uses per-metric evaluation** via shared `evaluateStatus()`: junction/vram critical temps override core-only normal state; null temps render `--` and never escalate. 4 states: default(gray), normal(green), warning(yellow), critical(red).
 - **Poll cycle**: `PollingService` owns the active settings and the cycle (fetch → classify → stale → notify → tray → push). All entry points (interval, stale check, manual refresh) run the same `runCycle()`.
@@ -137,6 +138,7 @@ npm run package                      # build + electron-builder --linux AppImage
 - **No default params in service constructors** — every dependency explicit.
 - **`.fallow/` directory**: fallow analysis config present. Run `npx fallow audit --base HEAD` after changes to `main.ts`.
 - **Three different dev servers**: `npm start` runs concurrently, but for focused work use `npm run start:render` (webpack dev HMR) or `npm run start:main` (electron only, needs prior build).
+- **Stale-agent fingerprint**: an agent reporting `junctionTemp: 0.0` and `vramTemp: 0.0` simultaneously predates the null-reporting fix (`2219b54`) — redeploy it with `agent/scripts/deploy.sh`. Agents 1.0.0+ carry `agentVersion`, so version drift is directly observable.
 
 ## Agent skills
 

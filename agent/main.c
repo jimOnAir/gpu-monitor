@@ -36,6 +36,9 @@
 
 #define DEFAULT_PORT 8080
 #define BUFFER_SIZE 8192
+/* Human-bumped semver; changes only when the protocol/behavior changes.
+   Surfaced via --version, /health ("version"), and /gpu ("agentVersion"). */
+#define AGENT_VERSION "1.0.0"
 
 static struct GpuData *gpus = NULL;
 static unsigned int gpu_count = 0;
@@ -139,7 +142,7 @@ char* generate_json_response(void) {
     }
 
     time_t now = time(NULL);
-    int offset = snprintf(response, buf_size, "{\"timestamp\":%ld,\"gpus\":[", now);
+    int offset = snprintf(response, buf_size, "{\"timestamp\":%ld,\"agentVersion\":\"%s\",\"gpus\":[", now, AGENT_VERSION);
 
     for (int i = 0; i < gpu_count; i++) {
         struct GpuData *gpu = &gpus[i];
@@ -267,7 +270,8 @@ enum MHD_Result handle_request(void *cls __attribute__((unused)), struct MHD_Con
     }
     
     if (strcmp(url, "/health") == 0) {
-        const char *health = "{\"status\":\"ok\"}";
+        char health[128];
+        snprintf(health, sizeof(health), "{\"status\":\"ok\",\"version\":\"%s\"}", AGENT_VERSION);
         struct MHD_Response *response = create_response(health, strlen(health));
         enum MHD_Result ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
         MHD_destroy_response(response);
@@ -283,6 +287,11 @@ enum MHD_Result handle_request(void *cls __attribute__((unused)), struct MHD_Con
 }
 
 int main(int argc, char *argv[]) {
+    if (argc > 1 && strcmp(argv[1], "--version") == 0) {
+        printf("gputempd %s\n", AGENT_VERSION);
+        return 0;
+    }
+
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
@@ -347,8 +356,9 @@ int main(int argc, char *argv[]) {
                    "GPU temperature daemon — reads Core/Junction/VRAM temps via NVML + NVAPI.\n"
                    "\n"
                    "Options:\n"
-                   "  port      HTTP port (default: 8080, or GPUTEMP_PORT env var)\n"
-                   "  --help    Show this help message\n"
+                   "  port        HTTP port (default: 8080, or GPUTEMP_PORT env var)\n"
+                   "  --help      Show this help message\n"
+                   "  --version   Print version and exit\n"
                    "\n"
                     "Environment:\n"
                     "  GPUTEMP_PORT         - HTTP port\n"
@@ -358,8 +368,8 @@ int main(int argc, char *argv[]) {
                     "by the GPU Monitor app against user-configured thresholds.\n"
                     "\n"
                    "API:\n"
-                   "  GET /gpu     - JSON {timestamp, gpus: [...]}\n"
-                   "  GET /health  - {\"status\":\"ok\"}\n"
+                   "  GET /gpu     - JSON {timestamp, agentVersion, gpus: [...]}\n"
+                   "  GET /health  - {\"status\":\"ok\",\"version\":\"...\"}\n"
                    "\n"
                    "Note: Junction/VRAM temps use NVAPI (libnvidia-api.so.1); the legacy\n"
                    "      /dev/mem BAR0 fallback requires `iomem=relaxed` (not available\n"

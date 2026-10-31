@@ -1,4 +1,4 @@
-import type { IAgent, IGpu } from '@gpu-monitor/shared';
+import type { IAgent, IAgentGpuResponse } from '@gpu-monitor/shared';
 
 import { validateGpuResponse } from '../../gpu-validation';
 import type { Logger } from '../../logger';
@@ -6,12 +6,12 @@ import type { Logger } from '../../logger';
 import type { IHttpAdapter } from './IHttpAdapter';
 
 export interface AgentFetchResult {
-  gpus: { gpus: IGpu[], timestamp?: number } | null;
+  gpus: IAgentGpuResponse | null;
   healthOk: boolean;
 }
 
 export type ClassifiedResult
-  = | { status: 'ok', gpus: { gpus: IGpu[], timestamp?: number } }
+  = | { status: 'ok', gpus: IAgentGpuResponse }
   | { status: 'fetch-failed' | 'health-failed' | 'invalid' };
 
 /**
@@ -31,7 +31,7 @@ export class AgentPoller {
     this.logger.info({ agent: agent.id, fetchUrl, healthUrl }, 'polling agent');
 
     const [gpuData, healthData] = await Promise.all([
-      this.httpAdapter.getJson<{ gpus: IGpu[], timestamp?: number }>(fetchUrl),
+      this.httpAdapter.getJson<IAgentGpuResponse>(fetchUrl),
       this.httpAdapter.getJson<{ status: string }>(healthUrl),
     ]);
 

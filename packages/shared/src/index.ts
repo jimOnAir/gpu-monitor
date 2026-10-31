@@ -3,6 +3,7 @@ export { EIPC } from './enums/EIPC';
 export type { IGpu } from './types/IGpu';
 export type { IGpuAverages, IMetricWindows } from './types/IGpuAverages';
 export type { IAgent } from './types/IAgent';
+export type { IAgentGpuResponse } from './types/IAgentGpuResponse';
 export type { ISettings, ITemperatureThresholds, INotificationsConfig, INotificationCooldowns } from './types/ISettings';
 export { DEFAULT_SETTINGS, evaluateStatus, worstStatus } from './status';
 export type { MetricStatus } from './status';

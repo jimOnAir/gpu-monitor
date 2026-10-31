@@ -58,6 +58,7 @@ GPUTEMP_PORT=9100 sudo ./gputempd
 ```json
 {
   "timestamp": 1700000000,
+  "agentVersion": "1.0.0",
   "gpus": [
     {
       "uuid": "GPU-63e7dc09-e444-285c-3f3d-67aed394f06d",
@@ -83,13 +84,14 @@ GPUTEMP_PORT=9100 sudo ./gputempd
 | Field | Type | Description |
 |-------|------|-------------|
 | `timestamp` | int | Unix timestamp of the snapshot |
+| `agentVersion` | string | gputempd build version (agents older than 1.0.0 omit this field) |
 | `gpus` | array | Array of GPU objects |
 | `gpus[].uuid` | string | NVML GPU UUID (stable identifier) |
 | `gpus[].index` | int | NVML device index |
 | `gpus[].name` | string | GPU model name |
 | `gpus[].coreTemp` | float | Core temperature (°C) |
-| `gpus[].junctionTemp` | float \| null | Junction temperature (°C), `null` if sensor unavailable |
-| `gpus[].vramTemp` | float \| null | VRAM temperature (°C), `null` if sensor unavailable |
+| `gpus[].junctionTemp` | float \| null | Junction temperature (°C), `null` if sensor unavailable or reading outside 1–255 °C |
+| `gpus[].vramTemp` | float \| null | VRAM temperature (°C), `null` if sensor unavailable or reading outside 1–255 °C |
 | `gpus[].gpuUtilization` | float | GPU utilization (%) |
 | `gpus[].memoryUsed` | int | Video memory used (bytes) |
 | `gpus[].memoryTotal` | int | Total video memory (bytes) |
@@ -111,7 +113,7 @@ GPUTEMP_PORT=9100 sudo ./gputempd
 **`GET /health`** — проверка доступности:
 
 ```json
-{"status":"ok"}
+{"status":"ok","version":"1.0.0"}
 ```
 
 ## Настройка логирования (env vars)

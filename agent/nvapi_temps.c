@@ -250,7 +250,9 @@ static int therm_channel_value(NvPhysicalGpuHandle handle, const NvApiThermChann
     }
 
     int raw = sensors.temps[idx];
-    if (raw <= 0 || raw >= 255 * 256) {
+    /* 8.8 fixed-point: raw < 256 decodes to < 1°C — sub-1 values serialize as "0.0"
+       and are indistinguishable from a dead sensor, so treat them as invalid. */
+    if (raw < 256 || raw >= 255 * 256) {
         return 0;
     }
     *outC = raw / 256.0;

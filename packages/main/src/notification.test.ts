@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { NotificationService } from './domains/notifications/NotificationService';
 import type { AgentData } from './domains/polling/AgentData';
+import { validateGpuResponse } from './gpu-validation';
 
 // Mock the notification dispatcher — the service depends on an interface, not electron directly
 const mockNotifications: Array<{ title: string, body: string, icon: string, silent: boolean }> = [];
@@ -335,6 +336,39 @@ describe('NotificationService', () => {
       data.gpus.set('test', [buildGpu(0, { junctionTemp: null })]);
       service.evaluateAndNotify(data, settings);
       expect(mockNotifications.filter((n) => n.title.includes('Junction'))).toHaveLength(0);
+    });
+
+    it('treats an implausible 0 reading as unavailable end-to-end (no false recovery)', () => {
+      const rawGpu = {
+        index: 0,
+        name: 'Test GPU',
+        uuid: 'GPU-000',
+        coreTemp: 60,
+        junctionTemp: 65,
+        gpuUtilization: 30,
+        memoryUsed: 2e9,
+        memoryTotal: 16e9,
+        powerUsage: 100,
+      };
+      const warned = validateGpuResponse({ gpus: [{ ...rawGpu, vramTemp: 85 }] });
+      const faulted = validateGpuResponse({ gpus: [{ ...rawGpu, vramTemp: 0 }] });
+      if (!warned || !faulted) {
+        throw new Error('test fixture must pass validation');
+      }
+      expect(faulted.gpus[0]?.vramTemp).toBeNull();
+
+      // Cycle 1: VRAM at 85°C (warn=80) → warning fires
+      const data = buildData();
+      data.gpus.set('test', warned.gpus);
+      service.evaluateAndNotify(data, settings);
+      expect(mockNotifications.filter((n) => n.title.includes('Vram'))).toHaveLength(1);
+
+      // Cycle 2: stale agent emits vramTemp 0.0 for a dead sensor → normalized to null,
+      // previous state retained — must NOT fire "Recovered"
+      resetMock();
+      data.gpus.set('test', faulted.gpus);
+      service.evaluateAndNotify(data, settings);
+      expect(mockNotifications.filter((n) => n.title.includes('Vram'))).toHaveLength(0);
     });
   });
 });

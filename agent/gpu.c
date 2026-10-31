@@ -169,7 +169,8 @@ static int bar0_read_temp(uint32_t bar0, uint32_t reg_offset, double *out,
     close(fd);
 
     double temp = (double)((val >> shift) & mask) / divisor;
-    if (temp <= 0 || temp >= 255) {
+    /* < 1°C decodes as garbage that prints "0.0" — reject as out of plausible band */
+    if (temp < 1.0 || temp >= 255) {
         log_debug("BAR0 %s: raw=0x%08X parsed %.0f\u00b0C — out of range", what, val, temp);
         return 0;
     }

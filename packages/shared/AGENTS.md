@@ -27,6 +27,7 @@ Runs `tsc` against `tsconfig.json`, outputs to `dist/`.
 - `DEFAULT_SETTINGS` — default settings object (lives in `status.ts`, not `ISettings.ts`)
 - `IGpu` — GPU identity, temps, utilization, power; `junctionTemp`/`vramTemp` are `number | null` (null = sensor unavailable on this architecture); optional extended fields: `fanSpeed`, `gpuClockMHz`, `memClockMHz`, `tempShutdown`, `tempSlowdown`, `powerCapW`, `driverVersion`, `perfState`, `vendor`, `model`, `partNumber` (the C agent no longer sends status fields — consumers compute status via `evaluateStatus`)
 - `IAgent` — agent endpoint configuration; `status` is optional (defaults handled by main process)
+- `IAgentGpuResponse` — raw `/gpu` response shape (`gpus`, optional `timestamp`, optional `agentVersion`; absent on agents older than 1.0.0)
 - `ISettings` — app settings (agents list, refresh interval, thresholds, notifications config)
 - `INotificationsConfig` — notifications settings (enabled, cooldowns)
 - `EAgentStatus` — enum for agent connection states
